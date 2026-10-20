@@ -2014,6 +2014,41 @@ Chcete je také přečíslovat?</numerusform>
         <translation>Poloha barev žil</translation>
     </message>
     <message>
+        <location filename="../sources/cable/cablepropertieswidget.cpp" line="116"/>
+        <source>Text rotation</source>
+        <translation>Natočení textu</translation>
+    </message>
+    <message>
+        <location filename="../sources/cable/cablepropertieswidget.cpp" line="117"/>
+        <source>Turns all the cable text as one block around the left end of the line, in degrees clockwise. 0 leaves it as it is drawn by default.</source>
+        <translation>Natočí celý text kabelu jako jeden blok kolem levého konce čáry, ve stupních po směru hodinových ručiček. 0 ponechá výchozí podobu.</translation>
+    </message>
+    <message>
+        <location filename="../sources/cable/cablepropertieswidget.cpp" line="120"/>
+        <source>Core colors rotation</source>
+        <translation>Natočení barev žil</translation>
+    </message>
+    <message>
+        <location filename="../sources/cable/cablepropertieswidget.cpp" line="121"/>
+        <source>Turns each core color around its own center, in degrees clockwise. 0 leaves them written along the line, 90 writes them level.</source>
+        <translation>Natočí každou barvu žíly kolem jejího středu, ve stupních po směru hodinových ručiček. 0 ji ponechá psanou podél čáry, 90 ji napíše vodorovně.</translation>
+    </message>
+    <message>
+        <location filename="../sources/cable/cablepropertieswidget.cpp" line="88"/>
+        <source>Core cross-section</source>
+        <translation>Průřez žil</translation>
+    </message>
+    <message>
+        <location filename="../sources/cable/cablepropertieswidget.cpp" line="89"/>
+        <source>e.g. 2,5</source>
+        <translation>např. 2,5</translation>
+    </message>
+    <message>
+        <location filename="../sources/cable/cablepropertieswidget.cpp" line="90"/>
+        <source>Written under the color of every core. A plain number gets &quot;mm²&quot; added.</source>
+        <translation>Píše se pod barvu každé žíly. K samotnému číslu se doplní „mm²“.</translation>
+    </message>
+    <message>
         <location filename="../sources/cable/cablepropertieswidget.cpp" line="110"/>
         <source>Shifts the core colors relative to their slashes. The slashes, the entries and the wiring stay in place. 10 px make one grid cell.</source>
         <translation>Posune barvy žil vůči jejich lomítkům. Lomítka, vstupy a zapojení zůstanou na místě. 10 px odpovídá jednomu políčku mřížky.</translation>

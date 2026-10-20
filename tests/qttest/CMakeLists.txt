@@ -299,6 +299,9 @@ qet_add_app_test(tst_conductorbend tst_conductorbend.cpp)
 target_compile_definitions(tst_conductorbend PRIVATE
   "QET_EXAMPLES_DIR=\"${QET_DIR}/examples\"")
 
+# Turning the text of a cable and the colours of its cores: saved, read
+# back, and drawn inside the item's bounding rectangle.
+qet_add_app_test(tst_cablerotation tst_cablerotation.cpp)
 
 # Accepting the settings dialog writes qet-assistant.json with the
 # collection paths just chosen, not the ones they replace.

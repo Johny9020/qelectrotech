@@ -26,6 +26,7 @@
 #include <QFont>
 #include <QPointer>
 #include <QSet>
+#include <QTransform>
 #include <QUuid>
 
 class Cable;
@@ -282,6 +283,22 @@ class CablePart : public QetGraphicsItem
 			*/
 		QPointF coreOffset() const;
 			/**
+				How far the label, and how far the colours, are turned,
+				in degrees clockwise: what the form offers next to
+				their positions, 0 for a cable never turned.
+			*/
+		qreal textRotation() const;
+		qreal coreRotation() const;
+			/**
+				Turns the whole label -- the lines over the trunk line
+				and those under it -- as one thing around the left end
+				of the line (where the label hangs), nudged along with
+				it. The rectangles of the texts are worked out unturned;
+				this is what puts them where they are really drawn.
+				@return the identity when the label is not turned
+			*/
+		QTransform labelTransform() const;
+			/**
 				Where a text of this width starts, at the left end of
 				the trunk line: before the line when it is set to end
 				there (the way it always did), on the line when it is
@@ -336,6 +353,7 @@ class CablePart : public QetGraphicsItem
 		QRectF typeRect() const;
 		QRectF lengthRect() const;
 		QRectF coreLabelRect(const QPointF &at, const QString &color) const;
+		QSizeF coreLabelSize(const QString &text) const;
 		QPointF coreLabelPivot(const QPointF &at, const QString &color) const;
 		QPointF coreDrawPosition(const CableCore &core) const;
 		bool coreDrawn(const CableCore &core) const;

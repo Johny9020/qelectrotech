@@ -113,6 +113,16 @@ class CablePropertiesWidget : public QWidget
 						  const QString &tip,
 						  QSpinBox **dx,
 						  QSpinBox **dy);
+			/**
+				One row of the form for how far a text is turned, in
+				degrees clockwise.
+				@param grid @param row @param name @param tip as above
+				@return the spin box of that row
+			*/
+		QSpinBox *addRotationRow(QGridLayout *grid,
+								 int row,
+								 const QString &name,
+								 const QString &tip);
 			///Open the window setting one text, then say so if it changed
 		void editFormat(const QString &key);
 			///Let the button say which size that text is written with
@@ -137,6 +147,8 @@ class CablePropertiesWidget : public QWidget
 		QLineEdit *m_installation = nullptr;
 		QLineEdit *m_location = nullptr;
 		QLineEdit *m_length = nullptr;
+		QLineEdit *m_core_section = nullptr;
+		QCheckBox *m_show_core_section = nullptr;
 		QCheckBox *m_show_designation = nullptr;
 		QCheckBox *m_show_type = nullptr;
 		QCheckBox *m_show_installation = nullptr;
@@ -153,6 +165,9 @@ class CablePropertiesWidget : public QWidget
 			///How far the row of colours is nudged on the drawing
 		QSpinBox *m_core_offset_x = nullptr;
 		QSpinBox *m_core_offset_y = nullptr;
+			///How far the label and the row of colours are turned
+		QSpinBox *m_text_rotation = nullptr;
+		QSpinBox *m_core_rotation = nullptr;
 };
 
 #endif // CABLEPROPERTIESWIDGET_H

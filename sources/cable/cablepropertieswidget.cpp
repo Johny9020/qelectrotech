@@ -83,6 +83,13 @@ CablePropertiesWidget::CablePropertiesWidget(QWidget *parent) :
 			 tr("Location (+)"), &m_location, &m_show_location);
 	addField(grid, row++, QStringLiteral("length"),
 			 tr("Length"), &m_length, &m_show_length);
+		//No font button of its own: the cross-section is written with
+		//the colours, as the second line of every core mark
+	addField(grid, row++, QString(),
+			 tr("Core cross-section"), &m_core_section, &m_show_core_section);
+	m_core_section->setPlaceholderText(tr("e.g. 2,5"));
+	m_core_section->setToolTip(tr("Written under the color of every core. "
+								  "A plain number gets \"mm²\" added."));
 
 		//The colours of the cores: one setting for every one of them at
 		//once, since they are written in one row along the line and are
@@ -111,6 +118,16 @@ CablePropertiesWidget::CablePropertiesWidget(QWidget *parent) :
 					"The slashes, the entries and the wiring stay in place. "
 					"10 px make one grid cell."),
 				 &m_core_offset_x, &m_core_offset_y);
+
+		//How far each of the two is turned
+	m_text_rotation = addRotationRow(grid, row + 3, tr("Text rotation"),
+				 tr("Turns all the cable text as one block around the left "
+					"end of the line, in degrees clockwise. 0 leaves it "
+					"as it is drawn by default."));
+	m_core_rotation = addRotationRow(grid, row + 4, tr("Core colors rotation"),
+				 tr("Turns each core color around its own center, in "
+					"degrees clockwise. 0 leaves them written along the "
+					"line, 90 writes them level."));
 
 	grid->setColumnStretch(2, 1);
 }
@@ -152,7 +169,9 @@ void CablePropertiesWidget::addField(QGridLayout *grid,
 	grid->addWidget(label, row, 0, Qt::AlignRight | Qt::AlignVCenter);
 	grid->addWidget(check, row, 1, Qt::AlignCenter);
 	grid->addWidget(field, row, 2);
-	addFormatButton(grid, row, key);
+	if (!key.isEmpty()) {
+		addFormatButton(grid, row, key);
+	}
 
 	*edit = field;
 	*tick = check;
@@ -246,6 +265,35 @@ void CablePropertiesWidget::addOffsetRow(QGridLayout *grid,
 	*dy = y_box;
 }
 
+QSpinBox *CablePropertiesWidget::addRotationRow(QGridLayout *grid,
+												int row,
+												const QString &name,
+												const QString &tip)
+{
+	auto *label = new QLabel(name, this);
+	label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+	label->setToolTip(tip);
+
+	auto *box = new QSpinBox(this);
+	box->setRange(-180, 180);
+	box->setSingleStep(15);
+	box->setWrapping(true);
+	box->setSuffix(QStringLiteral("°"));
+	box->setAlignment(Qt::AlignRight);
+	box->setToolTip(tip);
+	connect(box, &QSpinBox::valueChanged,
+			this, &CablePropertiesWidget::propertiesEdited);
+
+	auto *values = new QHBoxLayout;
+	values->setContentsMargins(0, 0, 0, 0);
+	values->addWidget(box);
+	values->addStretch(1);
+
+	grid->addWidget(label, row, 0, Qt::AlignRight | Qt::AlignVCenter);
+	grid->addLayout(values, row, 2);
+	return box;
+}
+
 /**
 	@brief CablePropertiesWidget::editFormat
 	Open the window where one text of the cable is set, and -- when he
@@ -332,6 +380,8 @@ CableProperties CablePropertiesWidget::properties() const
 	properties.installation = m_installation->text().trimmed();
 	properties.location = m_location->text().trimmed();
 	properties.length = m_length->text().trimmed();
+	properties.core_section = m_core_section->text().trimmed();
+	properties.show_core_section = m_show_core_section->isChecked();
 	properties.show_designation = m_show_designation->isChecked();
 	properties.show_type = m_show_type->isChecked();
 	properties.show_installation = m_show_installation->isChecked();
@@ -342,6 +392,8 @@ CableProperties CablePropertiesWidget::properties() const
 									 m_text_offset_y->value());
 	properties.core_offset = QPointF(m_core_offset_x->value(),
 									 m_core_offset_y->value());
+	properties.text_rotation = m_text_rotation->value();
+	properties.core_rotation = m_core_rotation->value();
 	return properties;
 }
 
@@ -363,6 +415,8 @@ void CablePropertiesWidget::setProperties(const CableProperties &properties)
 	m_installation->setText(properties.installation);
 	m_location->setText(properties.location);
 	m_length->setText(properties.length);
+	m_core_section->setText(properties.core_section);
+	m_show_core_section->setChecked(properties.show_core_section);
 	m_show_designation->setChecked(properties.show_designation);
 	m_show_type->setChecked(properties.show_type);
 	m_show_installation->setChecked(properties.show_installation);
@@ -380,6 +434,17 @@ void CablePropertiesWidget::setProperties(const CableProperties &properties)
 	m_text_offset_y->setValue(qRound(properties.text_offset.y()));
 	m_core_offset_x->setValue(qRound(properties.core_offset.x()));
 	m_core_offset_y->setValue(qRound(properties.core_offset.y()));
+	const QSignalBlocker block_text_rotation(m_text_rotation);
+	const QSignalBlocker block_core_rotation(m_core_rotation);
+		//The box wraps at ±180: a turn read from a file as 270 is -90
+	const auto wrapped = [](qreal angle) {
+		int a = qRound(angle) % 360;
+		if (a > 180) a -= 360;
+		if (a < -180) a += 360;
+		return a;
+	};
+	m_text_rotation->setValue(wrapped(properties.text_rotation));
+	m_core_rotation->setValue(wrapped(properties.core_rotation));
 
 		//The texts this cable writes its own way. Only what really has
 		//an answer of its own is kept, so that a stray empty entry can

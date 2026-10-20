@@ -329,6 +329,30 @@ QPointF CablePart::coreOffset() const
 	return m_cable ? m_cable->properties().core_offset : QPointF();
 }
 
+qreal CablePart::textRotation() const
+{
+	return m_cable ? m_cable->properties().text_rotation : 0.0;
+}
+
+qreal CablePart::coreRotation() const
+{
+	return m_cable ? m_cable->properties().core_rotation : 0.0;
+}
+
+QTransform CablePart::labelTransform() const
+{
+	const qreal angle = textRotation();
+	if (qFuzzyIsNull(angle)) return QTransform();
+
+	const QPointF pivot = QPointF(qMin(m_p1.x(), m_p2.x()),
+								  qMin(m_p1.y(), m_p2.y())) + textOffset();
+	QTransform transform;
+	transform.translate(pivot.x(), pivot.y());
+	transform.rotate(angle);
+	transform.translate(-pivot.x(), -pivot.y());
+	return transform;
+}
+
 /**
 	@brief CablePart::textLeft
 	Where a text of this width starts, at the left end of the trunk
@@ -588,10 +612,11 @@ QList<CablePart::CrossRef> CablePart::crossRefs() const
 */
 int CablePart::crossRefAt(const QPointF &scene_pos) const
 {
+	const QPointF unturned = labelTransform().inverted().map(scene_pos);
 	int index = 0;
 	for (const LabelLine &line : refLines())
 	{
-		if (line.rect.contains(scene_pos)) return index;
+		if (line.rect.contains(unturned)) return index;
 		++index;
 	}
 	return -1;
@@ -657,7 +682,7 @@ QList<CablePart::PdfRef> CablePart::pdfRefs() const
 
 		PdfRef link;
 		link.diagram = ref.diagram;
-		link.here = lines.at(i).rect;
+		link.here = labelTransform().mapRect(lines.at(i).rect);
 
 			//The section standing over there, which is what the reader
 			//has to be brought to. It is looked for the same way a click
@@ -864,20 +889,21 @@ QRectF CablePart::boundingRect() const
 				QPointF(qMax(m_p1.x(), m_p2.x()), qMax(m_p1.y(), m_p2.y())));
 	rect.adjust(-14.0, -14.0, 14.0, 14.0);
 
+	const QTransform turn = labelTransform();
 	const QRectF label = labelRect();
 	if (!label.isEmpty()) {
-		rect = rect.united(label);
+		rect = rect.united(turn.mapRect(label));
 	}
 	const QRectF type = typeRect();
 	if (!type.isEmpty()) {
-		rect = rect.united(type);
+		rect = rect.united(turn.mapRect(type));
 	}
 	const QRectF length = lengthRect();
 	if (!length.isEmpty()) {
-		rect = rect.united(length);
+		rect = rect.united(turn.mapRect(length));
 	}
 	for (const LabelLine &line : refLines()) {
-		rect = rect.united(line.rect);
+		rect = rect.united(turn.mapRect(line.rect));
 	}
 
 	if (m_cable)
@@ -886,7 +912,7 @@ QRectF CablePart::boundingRect() const
 		{
 			if (core.part != m_part_uuid || !coreDrawn(core)) continue;
 			const QPointF at = (core.core == m_dragged_core) ? m_drag_scene : coreDrawPosition(core);
-			rect = rect.united(coreLabelRect(at, m_cable->colorOfCore(core.core))
+			rect = rect.united(coreLabelRect(at, m_cable->coreMarkText(core.core))
 							   .adjusted(-3.0, -3.0, 3.0, 3.0));
 		}
 			//The core which is only waiting to be put down is drawn
@@ -896,7 +922,7 @@ QRectF CablePart::boundingRect() const
 		if (m_pending_core >= 0)
 		{
 			rect = rect.united(coreLabelRect(m_drag_scene,
-											 m_cable->colorOfCore(m_pending_core))
+											 m_cable->coreMarkText(m_pending_core))
 							   .adjusted(-3.0, -3.0, 3.0, 3.0));
 		}
 	}
@@ -923,12 +949,31 @@ QRectF CablePart::boundingRect() const
 */
 QPointF CablePart::coreLabelPivot(const QPointF &at, const QString &color) const
 {
-	const QFontMetricsF metrics(coreFont());
-	const qreal length = metrics.horizontalAdvance(color);
-	const qreal thickness = metrics.height();
+	const QSizeF size = coreLabelSize(color);
+	const qreal length = size.width();
+	const qreal thickness = size.height();
 
 	return QPointF(at.x() - core_label_side - thickness * 0.5,
 				   at.y() - core_label_gap - length * 0.5) + coreOffset();
+}
+
+/**
+	@brief CablePart::coreLabelSize
+	@param text what is written beside a slash, one or more lines
+	@return the size of that text before it is turned: as wide as its
+	longest line, as tall as all its lines together
+*/
+QSizeF CablePart::coreLabelSize(const QString &text) const
+{
+	const QFontMetricsF metrics(coreFont());
+	const QStringList lines = text.split(QLatin1Char('\n'));
+	qreal width = 0.0;
+	for (const QString &line : lines) {
+		width = qMax(width, metrics.horizontalAdvance(line));
+	}
+	const qreal height = metrics.height()
+			+ metrics.lineSpacing() * (lines.size() - 1);
+	return QSizeF(width, height);
 }
 
 /**
@@ -945,14 +990,17 @@ QRectF CablePart::coreLabelRect(const QPointF &at, const QString &color) const
 {
 	if (color.isEmpty()) return QRectF();
 
-	const QFontMetricsF metrics(coreFont());
-	const qreal width = metrics.horizontalAdvance(color);
-	const qreal height = metrics.height();
+	const QSizeF size = coreLabelSize(color);
+	const qreal width = size.width();
+	const qreal height = size.height();
 
-		//The text is drawn around this point and then turned by -90°, so
-		//its screen rectangle is height wide and text length tall.
+		//The text is drawn around this point and then turned: by -90°
+		//(height wide and text length tall) unless he turned it further
 	const QPointF pivot = coreLabelPivot(at, color);
-	return QRectF(pivot.x() - height * 0.5, pivot.y() - width * 0.5, height, width);
+	QTransform turn;
+	turn.translate(pivot.x(), pivot.y());
+	turn.rotate(-90.0 + coreRotation());
+	return turn.mapRect(QRectF(-width * 0.5, -height * 0.5, width, height));
 }
 
 /**
@@ -1123,23 +1171,26 @@ QPainterPath CablePart::shape() const
 
 	QPainterPath result = stroker.createStroke(trunk);
 
+	QPainterPath texts;
 	const QRectF label = labelRect();
 	if (!label.isEmpty()) {
-		result.addRect(label);
+		texts.addRect(label);
 	}
 	const QRectF type = typeRect();
 	if (!type.isEmpty()) {
-		result.addRect(type);
+		texts.addRect(type);
 	}
 	const QRectF length = lengthRect();
 	if (!length.isEmpty()) {
-		result.addRect(length);
+		texts.addRect(length);
 	}
 		//The references to the other folios stand under those and are
 		//clicked the same way.
 	for (const LabelLine &line : refLines()) {
-		result.addRect(line.rect);
+		texts.addRect(line.rect);
 	}
+		//Clicked where they are drawn, turned or not
+	result.addPath(labelTransform().map(texts));
 
 	if (m_cable)
 	{
@@ -1154,7 +1205,7 @@ QPainterPath CablePart::shape() const
 				//so the grab reaches that way rather than the other.
 			result.addRect(QRectF(at - QPointF(18.0, slash_grab),
 								  QSizeF(24.0, slash_grab * 2.0)));
-			const QRectF text = coreLabelRect(at, m_cable->colorOfCore(core.core));
+			const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core.core));
 			if (!text.isEmpty()) {
 				result.addRect(text.adjusted(-3.0, -3.0, 3.0, 3.0));
 			}
@@ -1198,7 +1249,7 @@ bool CablePart::labelAt(int core, const QPointF &local) const
 	const QPointF at = coreDrawPosition(at_core);
 	if (QLineF(at, local).length() <= slash_grab) return true;
 
-	const QRectF text = coreLabelRect(at, m_cable->colorOfCore(core));
+	const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core));
 	return !text.isEmpty() && text.adjusted(-3.0, -3.0, 3.0, 3.0).contains(local);
 }
 
@@ -1226,7 +1277,7 @@ int CablePart::coreAt(const QPointF &local) const
 		if (QLineF(at, local).length() <= slash_grab) {
 			return core.core;
 		}
-		const QRectF text = coreLabelRect(at, m_cable->colorOfCore(core.core));
+		const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core.core));
 		if (!text.isEmpty() && text.adjusted(-3.0, -3.0, 3.0, 3.0).contains(local)) {
 			return core.core;
 		}
@@ -1251,6 +1302,7 @@ void CablePart::drawLabel(QPainter *painter, const QColor &ink) const
 
 	painter->save();
 	painter->setPen(ink);
+	painter->setTransform(labelTransform(), true);
 
 		//Every line brings the font it is written with: they are not
 		//measured with the same yard, so they may not be written with
@@ -1300,7 +1352,7 @@ void CablePart::drawCores(QPainter *painter, const QColor &ink) const
 		const bool dragged = (core.core == m_dragged_core);
 		const QPointF at = dragged ? m_drag_scene : coreDrawPosition(core);
 
-		drawCoreMark(painter, ink, at, m_cable->colorOfCore(core.core));
+		drawCoreMark(painter, ink, at, m_cable->coreMarkText(core.core));
 	}
 
 		//A core which is waiting to be put down shows where it would
@@ -1314,7 +1366,7 @@ void CablePart::drawCores(QPainter *painter, const QColor &ink) const
 		painter->save();
 		painter->setOpacity(painter->opacity() * 0.6);
 		drawCoreMark(painter, ink, m_drag_scene,
-					 m_cable->colorOfCore(m_pending_core));
+					 m_cable->coreMarkText(m_pending_core));
 		painter->restore();
 	}
 }
@@ -1335,8 +1387,6 @@ void CablePart::drawCoreMark(QPainter *painter, const QColor &ink,
 							 const QPointF &at, const QString &color) const
 {
 	const QFont core_font = coreFont();
-	const QFontMetricsF metrics(core_font);
-
 	painter->save();
 	painter->setFont(core_font);
 	painter->setPen(QPen(ink, 1.0));
@@ -1345,15 +1395,18 @@ void CablePart::drawCoreMark(QPainter *painter, const QColor &ink,
 
 	if (!color.isEmpty())
 	{
-		const qreal width = metrics.horizontalAdvance(color);
-		const qreal height = metrics.height();
+		const QSizeF size = coreLabelSize(color);
+		const qreal width = size.width();
+		const qreal height = size.height();
 		const QPointF pivot = coreLabelPivot(at, color);
 
 		painter->save();
 		painter->translate(pivot);
-		painter->rotate(-90.0);
+		painter->rotate(-90.0 + coreRotation());
+			//The colour and the cross-section under it start at the same
+			//left edge, like two lines of one note
 		painter->drawText(QRectF(-width * 0.5, -height * 0.5, width, height),
-						  Qt::AlignCenter, color);
+						  Qt::AlignLeft | Qt::AlignVCenter, color);
 		painter->restore();
 	}
 	painter->restore();

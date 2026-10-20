@@ -148,6 +148,9 @@ struct CableProperties
 	QString location;
 		///Length, typed in by hand
 	QString length;
+		///Cross-section of the cores, e.g. "2,5" or "2,5 mm²", written
+		///under the colour of every core; empty writes nothing
+	QString core_section;
 
 		///What of that is written next to the trunk line of the drawing
 	bool show_designation = true;
@@ -155,6 +158,7 @@ struct CableProperties
 	bool show_installation = true;
 	bool show_location = true;
 	bool show_length = true;
+	bool show_core_section = true;
 
 		///How each text is written -- font and alignment, keyed by the
 		///names listed on CableTextFormat. A text which is not in here
@@ -174,6 +178,12 @@ struct CableProperties
 		///and every wire behind them stay where they are, and so does the
 		///row itself when the trunk line is moved.
 	QPointF core_offset;
+		///How far the label and the row of colours are turned, in
+		///degrees, clockwise -- on top of the way they are written
+		///anyway (the colours already run along the line). 0 leaves
+		///them as they always were.
+	qreal text_rotation = 0.0;
+	qreal core_rotation = 0.0;
 
 	bool operator==(const CableProperties &other) const
 	{
@@ -188,9 +198,13 @@ struct CableProperties
 				&& show_installation == other.show_installation
 				&& show_location == other.show_location
 				&& show_length == other.show_length
+				&& core_section == other.core_section
+				&& show_core_section == other.show_core_section
 				&& texts == other.texts
 				&& text_offset == other.text_offset
-				&& core_offset == other.core_offset;
+				&& core_offset == other.core_offset
+				&& qFuzzyCompare(1.0 + text_rotation, 1.0 + other.text_rotation)
+				&& qFuzzyCompare(1.0 + core_rotation, 1.0 + other.core_rotation);
 	}
 	bool operator!=(const CableProperties &other) const
 	{
@@ -271,6 +285,11 @@ class Cable : public QObject
 		void setLocation(const QString &location);
 		QString length() const;
 		void setLength(const QString &length);
+		QString coreSection() const;
+		void setCoreSection(const QString &section);
+			///The cross-section as it is drawn, "2,5" turned into
+			///"2,5 mm²"; empty when it is not drawn at all
+		QString coreSectionText() const;
 
 			///Every field of the cable, and what of it is drawn on the sheet
 		CableProperties properties() const;
@@ -302,6 +321,9 @@ class Cable : public QObject
 		int firstFreeCore() const;
 		///The colour of a core, as written in the cable type file
 		QString colorOfCore(int core) const;
+			///What is written beside the slash of a core: its colour,
+			///and the cross-section on a second line when there is one
+		QString coreMarkText(int core) const;
 		///The text a conductor of this core shows, e.g. "15W1:br"
 		QString labelOfCore(int core) const;
 
@@ -334,6 +356,7 @@ class Cable : public QObject
 		QString m_installation;
 		QString m_location;
 		QString m_length;
+		QString m_core_section;
 		QString m_type;
 		int m_core_count = 0;
 		QStringList m_core_colors;
@@ -345,6 +368,7 @@ class Cable : public QObject
 		bool m_show_installation = true;
 		bool m_show_location = true;
 		bool m_show_length = true;
+		bool m_show_core_section = true;
 			///The texts this cable writes its own way, by the names
 			///listed on CableTextFormat; everything not in here follows
 			///what the preferences say
@@ -354,6 +378,8 @@ class Cable : public QObject
 			///in the project ever looks at
 		QPointF m_text_offset;
 		QPointF m_core_offset;
+		qreal m_text_rotation = 0.0;
+		qreal m_core_rotation = 0.0;
 };
 
 /**

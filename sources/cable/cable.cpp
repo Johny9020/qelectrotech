@@ -21,6 +21,8 @@
 #include <QDomElement>
 
 #include <algorithm>
+#include <cmath>
+#include <QRegularExpression>
 
 namespace {
 	/**
@@ -213,6 +215,49 @@ void Cable::setLength(const QString &length)
 }
 
 /**
+	@brief Cable::coreSection
+	@return the cross-section of the cores as it was typed in
+*/
+QString Cable::coreSection() const
+{
+	return m_core_section;
+}
+
+/**
+	@brief Cable::setCoreSection
+	@param section
+*/
+void Cable::setCoreSection(const QString &section)
+{
+	if (m_core_section == section) return;
+	m_core_section = section;
+	emit changed();
+}
+
+/**
+	@brief Cable::coreSectionText
+	The cross-section as the drawing writes it. A bare number gets its
+	unit, so "2,5" is written "2,5 mm²", and "mm2" becomes "mm²" -- the
+	little two is hard to type.
+	@return the text, empty when nothing is to be written
+*/
+QString Cable::coreSectionText() const
+{
+	if (!m_show_core_section) return QString();
+	QString text = m_core_section.trimmed();
+	if (text.isEmpty()) return text;
+
+	static const QRegularExpression number(
+		QStringLiteral("^\\d+(?:[.,]\\d+)?$"));
+	if (number.match(text).hasMatch()) {
+		return text + QStringLiteral(" mm\u00B2");
+	}
+	text.replace(QRegularExpression(QStringLiteral("mm2\\b")),
+				 QStringLiteral("mm\u00B2"));
+	return text;
+}
+
+/**
 	@brief Cable::properties
 	@return every field the user fills in, together with what of it he
 	want to see drawn next to the trunk line
@@ -226,6 +271,8 @@ CableProperties Cable::properties() const
 	properties.installation = m_installation;
 	properties.location = m_location;
 	properties.length = m_length;
+	properties.core_section = m_core_section;
+	properties.show_core_section = m_show_core_section;
 	properties.show_designation = m_show_designation;
 	properties.show_type = m_show_type;
 	properties.show_installation = m_show_installation;
@@ -234,6 +281,8 @@ CableProperties Cable::properties() const
 	properties.texts = m_texts;
 	properties.text_offset = m_text_offset;
 	properties.core_offset = m_core_offset;
+	properties.text_rotation = m_text_rotation;
+	properties.core_rotation = m_core_rotation;
 	return properties;
 }
 
@@ -254,6 +303,8 @@ void Cable::setProperties(const CableProperties &properties)
 	m_installation = properties.installation;
 	m_location = properties.location;
 	m_length = properties.length;
+	m_core_section = properties.core_section;
+	m_show_core_section = properties.show_core_section;
 	m_show_designation = properties.show_designation;
 	m_show_type = properties.show_type;
 	m_show_installation = properties.show_installation;
@@ -262,6 +313,8 @@ void Cable::setProperties(const CableProperties &properties)
 	m_texts = properties.texts;
 	m_text_offset = properties.text_offset;
 	m_core_offset = properties.core_offset;
+	m_text_rotation = properties.text_rotation;
+	m_core_rotation = properties.core_rotation;
 	emit changed();
 }
 
@@ -517,6 +570,20 @@ QString Cable::colorOfCore(int core) const
 }
 
 /**
+	@brief Cable::coreMarkText
+	@param core
+	@return the colour of that core, with the cross-section under it on
+	a second line when the cable has one to write, e.g. "BK\n2,5 mm²"
+*/
+QString Cable::coreMarkText(int core) const
+{
+	const QString color = colorOfCore(core);
+	const QString section = coreSectionText();
+	if (section.isEmpty() || color.isEmpty()) return color;
+	return color + QLatin1Char('\n') + section;
+}
+
+/**
 	@brief Cable::labelOfCore
 	The text written into the cable field of the conductor this core is
 	wired to. It is never typed by hand: it is worked out here, from the
@@ -702,6 +769,12 @@ QDomElement Cable::toXml(QDomDocument &document) const
 	if (!m_length.isEmpty()) {
 		root.setAttribute(QLatin1String("length"), m_length);
 	}
+	if (!m_core_section.isEmpty()) {
+		root.setAttribute(QLatin1String("core_section"), m_core_section);
+	}
+	if (!m_show_core_section) {
+		root.setAttribute(QLatin1String("show_core_section"), QLatin1String("0"));
+	}
 		//Only what was switched off is written: a cable written before
 		//these existed shows everything, like the ones written from now
 	if (!m_show_designation) {
@@ -742,7 +815,8 @@ QDomElement Cable::toXml(QDomDocument &document) const
 		//follows the default -- and a later change of that default still
 		//reaches it. The nudges are kept in the same element: they say
 		//where those texts stand rather than what the cable is.
-	if (!m_texts.isEmpty() || !m_text_offset.isNull() || !m_core_offset.isNull())
+	if (!m_texts.isEmpty() || !m_text_offset.isNull() || !m_core_offset.isNull()
+		|| !qFuzzyIsNull(m_text_rotation) || !qFuzzyIsNull(m_core_rotation))
 	{
 		QDomElement texts = document.createElement(QLatin1String("texts"));
 		bool stored = false;
@@ -778,6 +852,18 @@ QDomElement Cable::toXml(QDomDocument &document) const
 							   QString::number(m_core_offset.x(), 'f', 2));
 			texts.setAttribute(QLatin1String("core_dy"),
 							   QString::number(m_core_offset.y(), 'f', 2));
+			stored = true;
+		}
+		if (!qFuzzyIsNull(m_text_rotation))
+		{
+			texts.setAttribute(QLatin1String("text_rotation"),
+							   QString::number(m_text_rotation, 'f', 2));
+			stored = true;
+		}
+		if (!qFuzzyIsNull(m_core_rotation))
+		{
+			texts.setAttribute(QLatin1String("core_rotation"),
+							   QString::number(m_core_rotation, 'f', 2));
 			stored = true;
 		}
 		if (stored) {
@@ -834,6 +920,9 @@ void Cable::fromXml(const QDomElement &element)
 	m_installation = element.attribute(QLatin1String("installation"));
 	m_location = element.attribute(QLatin1String("location"));
 	m_length = element.attribute(QLatin1String("length"));
+	m_core_section = element.attribute(QLatin1String("core_section"));
+	m_show_core_section = element.attribute(
+		QLatin1String("show_core_section"), QLatin1String("1")).toInt() != 0;
 	m_show_designation = element.attribute(
 		QLatin1String("show_designation"), QLatin1String("1")).toInt() != 0;
 	m_show_type = element.attribute(
@@ -860,6 +949,8 @@ void Cable::fromXml(const QDomElement &element)
 	m_texts.clear();
 	m_text_offset = QPointF();
 	m_core_offset = QPointF();
+	m_text_rotation = 0.0;
+	m_core_rotation = 0.0;
 	const QDomElement texts = element.firstChildElement(QLatin1String("texts"));
 	for (QDomElement e = texts.firstChildElement(QLatin1String("text"));
 		 !e.isNull();
@@ -879,6 +970,14 @@ void Cable::fromXml(const QDomElement &element)
 		m_text_offset.setY(texts.attribute(QLatin1String("text_dy")).toDouble());
 		m_core_offset.setX(texts.attribute(QLatin1String("core_dx")).toDouble());
 		m_core_offset.setY(texts.attribute(QLatin1String("core_dy")).toDouble());
+			//"nan" and "inf" parse as numbers: a turn which is not finite
+			//is no turn at all
+		const auto angle = [&texts](const char *name) {
+			const qreal a = texts.attribute(QLatin1String(name)).toDouble();
+			return qIsFinite(a) ? std::fmod(a, 360.0) : 0.0;
+		};
+		m_text_rotation = angle("text_rotation");
+		m_core_rotation = angle("core_rotation");
 	}
 
 	m_parts.clear();
