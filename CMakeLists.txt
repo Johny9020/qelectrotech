@@ -226,7 +226,13 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_COPYRIGHT "Copyright 2006-2026 The QElectroTech Team"
+        MACOSX_BUNDLE_ICON_FILE "qelectrotech.icns"
     )
+    # Copy the app icon into the bundle's Contents/Resources.
+    set(QET_MAC_ICON ${QET_DIR}/ico/mac_icon/qelectrotech.icns)
+    set_source_files_properties(${QET_MAC_ICON} PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources")
+    target_sources(${PROJECT_NAME} PRIVATE ${QET_MAC_ICON})
 endif()
 
 # The default build only compiles the tracked .ts files to .qm (lrelease).
@@ -235,9 +241,17 @@ endif()
 # build rewrote tracked files as a side effect, and under high parallelism
 # lupdate rewriting a .ts while lrelease read the same file made the build
 # fail with "Premature end of document".
+if(APPLE)
+    # The macOS app looks for its translations inside the bundle
+    # (Contents/Resources/lang, see QET_LANG_PATH), so compile them there.
+    set(QET_QM_OUTPUT_DIR
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.app/Contents/Resources/lang")
+else()
+    set(QET_QM_OUTPUT_DIR "lang")
+endif()
 set_source_files_properties(
     ${TS_FILES}
-    PROPERTIES OUTPUT_LOCATION "lang"
+    PROPERTIES OUTPUT_LOCATION "${QET_QM_OUTPUT_DIR}"
 )
 if(Qt6_VERSION VERSION_LESS "6.2")
     # Qt 6.0–6.1
