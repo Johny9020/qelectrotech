@@ -293,6 +293,13 @@ qet_add_app_test(tst_multielementinfo tst_multielementinfo.cpp)
 target_compile_definitions(tst_multielementinfo PRIVATE
   "QET_EXAMPLES_DIR=\"${QET_DIR}/examples\"")
 
+# "Add a bend point" on a conductor: a detour of three segments where it
+# was clicked, ends kept, orthogonal, one undo step, saved, handles follow.
+qet_add_app_test(tst_conductorbend tst_conductorbend.cpp)
+target_compile_definitions(tst_conductorbend PRIVATE
+  "QET_EXAMPLES_DIR=\"${QET_DIR}/examples\"")
+
+
 # Accepting the settings dialog writes qet-assistant.json with the
 # collection paths just chosen, not the ones they replace.
 qet_add_app_test(tst_assistantinfopaths tst_assistantinfopaths.cpp)

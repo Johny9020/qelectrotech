@@ -120,6 +120,8 @@ class Conductor : public QGraphicsObject
 		const QList<ConductorSegment *> segmentsList() const;
 		bool moveSegment(int index, qreal dx, qreal dy);
 		bool setPathPoints(const QList<QPointF> &scene_points);
+		QList<QPointF> pathPointsWithBendAt(const QPointF &scene_pos) const;
+		bool addBendAt(const QPointF &scene_pos);
 
 		void setPropertyToPotential(
 				const ConductorProperties &property,

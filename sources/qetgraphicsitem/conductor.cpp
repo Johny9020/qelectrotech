@@ -1448,6 +1448,119 @@ bool Conductor::setPathPoints(const QList<QPointF> &scene_points)
 }
 
 /**
+	@brief Conductor::pathPointsWithBendAt
+	The path of this conductor with a small detour added on the segment
+	nearest to @p scene_pos: the segment is split and a rectangular bump,
+	two grid steps deep, is inserted where it was clicked. The bump brings
+	three new segments, each with its own handle, which the user then drags
+	to route the conductor as wanted.
+	A bump rather than a single corner: a corner would need a zero-length
+	segment, which ConductorSegment takes as horizontal whatever its place,
+	breaking the horizontal/vertical alternation the handles rely on.
+	@param scene_pos where the user asked for the bend, in scene coordinates
+	@return the new path points in scene coordinates, from terminal1 to
+	terminal2, as setPathPoints() takes them; empty if no segment near
+	@p scene_pos is long enough to take the bump.
+*/
+QList<QPointF> Conductor::pathPointsWithBendAt(const QPointF &scene_pos) const
+{
+	const QList<ConductorSegment *> segs = segmentsList();
+	if (segs.isEmpty()) return {};
+
+	QList<QPointF> points;
+	points << segs.first()->firstPoint();
+	for (ConductorSegment *s : segs) points << s->secondPoint();
+
+	const qreal grid_x = qMax(1, Diagram::xGrid);
+	const qreal grid_y = qMax(1, Diagram::yGrid);
+	const QPointF click = mapFromScene(scene_pos);
+
+		// The first and last segments only lead out of the terminals:
+		// keep them as they are when there is anything in between.
+	int first = 0, last = segs.size() - 1;
+	if (segs.size() >= 3) { ++first; --last; }
+
+		// Find the segment nearest to the click
+	int best = -1;
+	qreal best_distance = 0.0;
+	for (int i = first ; i <= last ; ++i)
+	{
+		const QPointF a = points.at(i), b = points.at(i + 1);
+		if (a == b) continue;
+		const bool horizontal = (qAbs(a.y() - b.y()) < 0.01);
+		const qreal along  = horizontal ? click.x() : click.y();
+		const qreal min    = horizontal ? qMin(a.x(), b.x()) : qMin(a.y(), b.y());
+		const qreal max    = horizontal ? qMax(a.x(), b.x()) : qMax(a.y(), b.y());
+		const qreal across = horizontal ? qAbs(click.y() - a.y())
+						: qAbs(click.x() - a.x());
+		const qreal outside = along < min ? min - along
+					: (along > max ? along - max : 0.0);
+		const qreal distance = across + outside;
+		if (best == -1 || distance < best_distance) {
+			best = i;
+			best_distance = distance;
+		}
+	}
+	if (best == -1 || best_distance > 2 * qMax(grid_x, grid_y)) return {};
+
+	const QPointF a = points.at(best), b = points.at(best + 1);
+	const bool horizontal = (qAbs(a.y() - b.y()) < 0.01);
+	const qreal step_along  = horizontal ? grid_x : grid_y;
+	const qreal step_across = horizontal ? grid_y : grid_x;
+	const qreal half_width = 2 * step_along;
+	const qreal depth      = 2 * step_across;
+
+		// The bump must leave at least one grid step of the segment on
+		// each side, so that it does not merge into the next corner.
+	const qreal min = horizontal ? qMin(a.x(), b.x()) : qMin(a.y(), b.y());
+	const qreal max = horizontal ? qMax(a.x(), b.x()) : qMax(a.y(), b.y());
+	const qreal low  = min + half_width + step_along;
+	const qreal high = max - half_width - step_along;
+	if (low > high) return {};
+
+	const QPointF snapped = Diagram::snapToGrid(click);
+	const qreal center = qBound(low, horizontal ? snapped.x() : snapped.y(), high);
+		// Along the segment, from a towards b
+	const qreal dir = horizontal ? (b.x() > a.x() ? 1 : -1)
+				     : (b.y() > a.y() ? 1 : -1);
+		// Bulge to the side that was clicked, up or left when on the line
+	const qreal offset = horizontal ? click.y() - a.y() : click.x() - a.x();
+	const qreal side = offset > 0.5 ? 1 : -1;
+
+	const qreal start = center - dir * half_width;
+	const qreal end   = center + dir * half_width;
+	QList<QPointF> bump;
+	if (horizontal) {
+		const qreal y = a.y(), out = y + side * depth;
+		bump << QPointF(start, y) << QPointF(start, out)
+			 << QPointF(end, out) << QPointF(end, y);
+	} else {
+		const qreal x = a.x(), out = x + side * depth;
+		bump << QPointF(x, start) << QPointF(out, start)
+			 << QPointF(out, end) << QPointF(x, end);
+	}
+
+	QList<QPointF> result;
+	for (int i = 0 ; i <= best ; ++i) result << mapToScene(points.at(i));
+	for (const QPointF &p : std::as_const(bump)) result << mapToScene(p);
+	for (int i = best + 1 ; i < points.size() ; ++i) result << mapToScene(points.at(i));
+	return result;
+}
+
+/**
+	@brief Conductor::addBendAt
+	Add a detour to this conductor where @p scene_pos is, as one undo step;
+	see pathPointsWithBendAt().
+	@return false, changing nothing, if no bend can be added there
+*/
+bool Conductor::addBendAt(const QPointF &scene_pos)
+{
+	const QList<QPointF> points = pathPointsWithBendAt(scene_pos);
+	if (points.isEmpty()) return false;
+	return setPathPoints(points);
+}
+
+/**
 	@brief Conductor::length
 	@return the length of this conductor
 */

@@ -61,6 +61,9 @@ class DiagramView : public PaletteGraphicsView
 		QAction          *m_generate_cabinet_thumbnail = nullptr;
 		QMenu            *m_folio_report_menu = nullptr;
 		QPoint            m_paste_here_pos;
+			/// Adds a bend to the conductor right-clicked, where it was clicked
+		QAction          *m_add_conductor_bend = nullptr;
+		QPointF           m_context_menu_scene_pos;
 		QPoint            m_press_pos;
 		DiagramContextToolbar *m_context_toolbar = nullptr;
 			/// Right-drag gestures: tracking since the right button went down

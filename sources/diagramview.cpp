@@ -138,6 +138,16 @@ DiagramView::DiagramView(Diagram *diagram, QWidget *parent) :
 	m_paste_here = new QAction(QET::Icons::EditPaste, tr("Paste Here", "context menu action"), this);
 	connect(m_paste_here, &QAction::triggered, this, &DiagramView::pasteHere);
 
+	m_add_conductor_bend = new QAction(QET::Icons::ConductorSettings, tr("Add a bend point", "context menu action"), this);
+	m_add_conductor_bend->setStatusTip(tr("Add a detour to the conductor where it was clicked; drag its handles to route the conductor", "status bar tip"));
+	connect(m_add_conductor_bend, &QAction::triggered, this, [this]() {
+		const QList<QGraphicsItem *> selection = m_diagram->selectedItems();
+		if (selection.size() != 1) return;
+		if (Conductor *conductor = qgraphicsitem_cast<Conductor *>(selection.first())) {
+			conductor->addBendAt(m_context_menu_scene_pos);
+		}
+	});
+
 	m_multi_paste = new QAction(QET::Icons::EditPaste, tr("Multiple paste"), this);
 	connect(m_multi_paste, &QAction::triggered, [this]() {
 		MultiPasteDialog d(this->m_diagram, this);
@@ -2295,6 +2305,14 @@ QList<QAction *> DiagramView::contextMenuActions() const
 				}));
 			list << m_generate_cabinet_thumbnail;
 			list << qde->m_conductor_reset;
+				//Only for a single conductor, and only where a bend fits
+			Conductor *conductor = selected_items.size() == 1
+				? qgraphicsitem_cast<Conductor *>(selected_items.first())
+				: nullptr;
+			m_add_conductor_bend->setEnabled(
+				conductor && !m_diagram->isReadOnly()
+				&& !conductor->pathPointsWithBendAt(m_context_menu_scene_pos).isEmpty());
+			list << m_add_conductor_bend;
 			list << m_separators.at(1);
 			list << qde->m_selection_actions_group.actions();
 			list << qde->m_align_menu->menuAction();
@@ -2470,6 +2488,7 @@ void DiagramView::contextMenuEvent(QContextMenuEvent *e)
 		updateFolioReportMenu();
 	}
 
+	m_context_menu_scene_pos = mapToScene(menu_pos);
 	QList <QAction *> list = contextMenuActions();
 	if(!list.isEmpty())
 	{

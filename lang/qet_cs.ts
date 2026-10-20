@@ -3657,6 +3657,18 @@ Hold Shift and drag to move this text on its own</source>
         <translation>Vložit zde</translation>
     </message>
     <message>
+        <location filename="../sources/diagramview.cpp" line="141"/>
+        <source>Add a bend point</source>
+        <comment>context menu action</comment>
+        <translation>Přidat bod lomu</translation>
+    </message>
+    <message>
+        <location filename="../sources/diagramview.cpp" line="142"/>
+        <source>Add a detour to the conductor where it was clicked; drag its handles to route the conductor</source>
+        <comment>status bar tip</comment>
+        <translation>Přidá do vodiče v místě kliknutí objížďku; tažením jejích úchytů vedete vodič, kudy potřebujete</translation>
+    </message>
+    <message>
         <location filename="../sources/diagramview.cpp" line="113"/>
         <source>In this area you conceive your diagrams by adding elements and conductors between their terminals. You may also add independent texts.</source>
         <comment>&quot;What&apos;s this?&quot; tip</comment>
