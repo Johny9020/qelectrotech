@@ -29,6 +29,7 @@
 #include "../qetgraphicsitem/conductor.h"
 #include "../utils/qetutils.h"
 
+#include <functional>
 #include <QApplication>
 #include <QCursor>
 #include <QGuiApplication>
@@ -912,7 +913,8 @@ QRectF CablePart::boundingRect() const
 		{
 			if (core.part != m_part_uuid || !coreDrawn(core)) continue;
 			const QPointF at = (core.core == m_dragged_core) ? m_drag_scene : coreDrawPosition(core);
-			rect = rect.united(coreLabelRect(at, m_cable->coreMarkText(core.core))
+			rect = rect.united(coreLabelRect(at, m_cable->coreMarkText(core.core),
+											 ownLabelOffset(core), core.label_rotation)
 							   .adjusted(-3.0, -3.0, 3.0, 3.0));
 		}
 			//The core which is only waiting to be put down is drawn
@@ -947,14 +949,55 @@ QRectF CablePart::boundingRect() const
 	colours and never the slash: the slash marks where the wire starts,
 	and that is not for a distance to decide.
 */
-QPointF CablePart::coreLabelPivot(const QPointF &at, const QString &color) const
+QPointF CablePart::coreLabelPivot(const QPointF &at, const QString &color,
+								  const QPointF &own_offset) const
 {
 	const QSizeF size = coreLabelSize(color);
 	const qreal length = size.width();
 	const qreal thickness = size.height();
 
 	return QPointF(at.x() - core_label_side - thickness * 0.5,
-				   at.y() - core_label_gap - length * 0.5) + coreOffset();
+				   at.y() - core_label_gap - length * 0.5) + coreOffset() + own_offset;
+}
+
+/**
+	@brief CablePart::ownLabelOffset
+	@param core a core standing on this line
+	@return how far its own label is moved: where the mouse holds it
+	while that label alone is dragged, what the cable says otherwise
+*/
+QPointF CablePart::ownLabelOffset(const CableCore &core) const
+{
+	if (core.core >= 0 && core.core == m_dragged_label) {
+		return m_label_drag_offset;
+	}
+	return core.label_offset;
+}
+
+/**
+	@brief CablePart::coreTextAt
+	The core whose colour text stands at that point -- the text and not
+	the slash: grabbing the slash moves the core along the line, grabbing
+	the text moves that one label on its own.
+	@param scene_pos
+	@return the core, -1 when no text stands there
+*/
+int CablePart::coreTextAt(const QPointF &scene_pos) const
+{
+	if (!m_cable) return -1;
+
+	const int core = coreAt(scene_pos);
+	if (core < 0) return -1;
+	const CableCore held = m_cable->core(core);
+	if (held.core != core) return -1;
+
+	const QPointF at = coreDrawPosition(held);
+	if (QLineF(at, scene_pos).length() <= slash_grab) return -1;
+
+	const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core),
+									  ownLabelOffset(held), held.label_rotation);
+	return (!text.isEmpty() && text.adjusted(-3.0, -3.0, 3.0, 3.0).contains(scene_pos))
+			? core : -1;
 }
 
 /**
@@ -986,7 +1029,8 @@ QSizeF CablePart::coreLabelSize(const QString &text) const
 	@return the rectangle in scene coordinates, empty when there is
 	nothing to write
 */
-QRectF CablePart::coreLabelRect(const QPointF &at, const QString &color) const
+QRectF CablePart::coreLabelRect(const QPointF &at, const QString &color,
+								const QPointF &own_offset, qreal own_rotation) const
 {
 	if (color.isEmpty()) return QRectF();
 
@@ -996,10 +1040,10 @@ QRectF CablePart::coreLabelRect(const QPointF &at, const QString &color) const
 
 		//The text is drawn around this point and then turned: by -90°
 		//(height wide and text length tall) unless he turned it further
-	const QPointF pivot = coreLabelPivot(at, color);
+	const QPointF pivot = coreLabelPivot(at, color, own_offset);
 	QTransform turn;
 	turn.translate(pivot.x(), pivot.y());
-	turn.rotate(-90.0 + coreRotation());
+	turn.rotate(-90.0 + coreRotation() + own_rotation);
 	return turn.mapRect(QRectF(-width * 0.5, -height * 0.5, width, height));
 }
 
@@ -1205,7 +1249,8 @@ QPainterPath CablePart::shape() const
 				//so the grab reaches that way rather than the other.
 			result.addRect(QRectF(at - QPointF(18.0, slash_grab),
 								  QSizeF(24.0, slash_grab * 2.0)));
-			const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core.core));
+			const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core.core),
+											  ownLabelOffset(core), core.label_rotation);
 			if (!text.isEmpty()) {
 				result.addRect(text.adjusted(-3.0, -3.0, 3.0, 3.0));
 			}
@@ -1249,7 +1294,8 @@ bool CablePart::labelAt(int core, const QPointF &local) const
 	const QPointF at = coreDrawPosition(at_core);
 	if (QLineF(at, local).length() <= slash_grab) return true;
 
-	const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core));
+	const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core),
+									  ownLabelOffset(at_core), at_core.label_rotation);
 	return !text.isEmpty() && text.adjusted(-3.0, -3.0, 3.0, 3.0).contains(local);
 }
 
@@ -1277,7 +1323,8 @@ int CablePart::coreAt(const QPointF &local) const
 		if (QLineF(at, local).length() <= slash_grab) {
 			return core.core;
 		}
-		const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core.core));
+		const QRectF text = coreLabelRect(at, m_cable->coreMarkText(core.core),
+										  ownLabelOffset(core), core.label_rotation);
 		if (!text.isEmpty() && text.adjusted(-3.0, -3.0, 3.0, 3.0).contains(local)) {
 			return core.core;
 		}
@@ -1352,7 +1399,8 @@ void CablePart::drawCores(QPainter *painter, const QColor &ink) const
 		const bool dragged = (core.core == m_dragged_core);
 		const QPointF at = dragged ? m_drag_scene : coreDrawPosition(core);
 
-		drawCoreMark(painter, ink, at, m_cable->coreMarkText(core.core));
+		drawCoreMark(painter, ink, at, m_cable->coreMarkText(core.core),
+					 ownLabelOffset(core), core.label_rotation);
 	}
 
 		//A core which is waiting to be put down shows where it would
@@ -1384,7 +1432,8 @@ void CablePart::drawCores(QPainter *painter, const QColor &ink) const
 	@param color the colour of that core, e.g. "br"
 */
 void CablePart::drawCoreMark(QPainter *painter, const QColor &ink,
-							 const QPointF &at, const QString &color) const
+							 const QPointF &at, const QString &color,
+							 const QPointF &own_offset, qreal own_rotation) const
 {
 	const QFont core_font = coreFont();
 	painter->save();
@@ -1398,11 +1447,11 @@ void CablePart::drawCoreMark(QPainter *painter, const QColor &ink,
 		const QSizeF size = coreLabelSize(color);
 		const qreal width = size.width();
 		const qreal height = size.height();
-		const QPointF pivot = coreLabelPivot(at, color);
+		const QPointF pivot = coreLabelPivot(at, color, own_offset);
 
 		painter->save();
 		painter->translate(pivot);
-		painter->rotate(-90.0 + coreRotation());
+		painter->rotate(-90.0 + coreRotation() + own_rotation);
 			//The colour and the cross-section under it start at the same
 			//left edge, like two lines of one note
 		painter->drawText(QRectF(-width * 0.5, -height * 0.5, width, height),
@@ -1609,6 +1658,21 @@ void CablePart::mousePressEvent(QGraphicsSceneMouseEvent *event)
 		return;
 	}
 
+		//The text of a colour, away from its slash: that one label is
+		//moved on its own, and the core goes on naming the same wire
+	const int text_core = coreTextAt(event->scenePos());
+	if (text_core >= 0)
+	{
+		m_dragged_label = text_core;
+		m_label_offset_before = m_cable->core(text_core).label_offset;
+		m_label_drag_offset = m_label_offset_before;
+		if (!isSelected()) {
+			setSelected(true);
+		}
+		event->accept();
+		return;
+	}
+
 	const int core = coreAt(event->scenePos());
 	if (core >= 0)
 	{
@@ -1678,6 +1742,19 @@ void CablePart::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 			m_drag_scene = placePosition(event->scenePos());
 			update();
 		}
+		event->accept();
+		return;
+	}
+
+	if (m_dragged_label >= 0)
+	{
+			//Whole pixels: a label is placed by eye, and a file full of
+			//hundredths would say more than anyone ever meant
+		const QPointF moved = event->scenePos() - m_press_scene;
+		prepareGeometryChange();
+		m_label_drag_offset = QPointF(qRound(m_label_offset_before.x() + moved.x()),
+									  qRound(m_label_offset_before.y() + moved.y()));
+		update();
 		event->accept();
 		return;
 	}
@@ -1835,6 +1912,32 @@ void CablePart::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
 		return;
 	}
 
+
+	if (m_dragged_label >= 0 && event->button() == Qt::LeftButton)
+	{
+		const int core = m_dragged_label;
+		const QPointF offset = m_label_drag_offset;
+		m_dragged_label = -1;
+		prepareGeometryChange();
+
+		CableCore held = m_cable ? m_cable->core(core) : CableCore();
+		if (held.core == core && held.label_offset != offset && diagram())
+		{
+			const QList<CableCore> before = m_cable->usedCores();
+			held.label_offset = offset;
+			QList<CableCore> after = before;
+			for (CableCore &c : after) {
+				if (c.core == core) c = held;
+			}
+			diagram()->undoStack().push(new ChangeCableCoresCommand(
+				m_cable, before, after,
+				QCoreApplication::translate("ChangeCableCoresCommand",
+											"Move a core label")));
+		}
+		update();
+		event->accept();
+		return;
+	}
 
 	if (m_dragged_core >= 0 && event->button() == Qt::LeftButton)
 	{
@@ -2334,6 +2437,76 @@ bool CablePart::takeCoreOffLine(int core)
 }
 
 /**
+	@brief changeCoreLabel
+	Write one core of this line back changed by \p change, as one undo
+	step named \p text.
+	@return true when something changed
+*/
+static bool changeCoreLabel(Cable *cable, Diagram *diagram, const QUuid &part,
+							int core, const std::function<void(CableCore &)> &change,
+							const QString &text)
+{
+	if (!cable || !diagram) return false;
+	const CableCore there = cable->core(core);
+	if (there.core != core || there.part != part) return false;
+
+	const QList<CableCore> before = cable->usedCores();
+	QList<CableCore> after = before;
+	for (CableCore &c : after) {
+		if (c.core == core) change(c);
+	}
+	if (after == before) return false;
+	diagram->undoStack().push(new ChangeCableCoresCommand(cable, before, after, text));
+	return true;
+}
+
+/**
+	@brief CablePart::turnCoreLabel
+	@param core a core standing on this line
+	@param by degrees, clockwise
+	@return true when the label was turned
+*/
+bool CablePart::turnCoreLabel(int core, qreal by)
+{
+	return changeCoreLabel(m_cable, diagram(), m_part_uuid, core,
+		[by](CableCore &c) {
+			qreal a = std::fmod(c.label_rotation + by, 360.0);
+			if (a > 180.0) a -= 360.0;
+			if (a <= -180.0) a += 360.0;
+			c.label_rotation = qFuzzyIsNull(a) ? 0.0 : a;
+		},
+		QCoreApplication::translate("ChangeCableCoresCommand", "Rotate a core label"));
+}
+
+/**
+	@brief CablePart::resetCoreLabel
+	@param core a core standing on this line
+	@return true when the label was moved or turned and now is not
+*/
+bool CablePart::resetCoreLabel(int core)
+{
+	return changeCoreLabel(m_cable, diagram(), m_part_uuid, core,
+		[](CableCore &c) {
+			c.label_offset = QPointF();
+			c.label_rotation = 0.0;
+		},
+		QCoreApplication::translate("ChangeCableCoresCommand", "Reset a core label"));
+}
+
+/**
+	@brief CablePart::coreLabelChanged
+	@param core
+	@return true when that core's label was moved or turned on its own
+*/
+bool CablePart::coreLabelChanged(int core) const
+{
+	if (!m_cable) return false;
+	const CableCore c = m_cable->core(core);
+	return c.core == core
+			&& (!c.label_offset.isNull() || !qFuzzyIsNull(c.label_rotation));
+}
+
+/**
 	@brief CablePart::reconcileCores
 	Where the colour labels of this line stand while the line is being
 	moved: exactly where they stood, taken along by however far the line
@@ -2514,6 +2687,7 @@ void CablePart::beginLineGesture()
 	m_line_drag_cores = m_cores_before;
 	m_stretch_end = 0;
 	m_dragged_core = -1;
+	m_dragged_label = -1;
 }
 
 /**
@@ -2612,6 +2786,7 @@ void CablePart::doneLineGesture()
 	m_cores_before.clear();
 	m_stretch_end = 0;
 	m_dragged_core = -1;
+	m_dragged_label = -1;
 }
 
 /**

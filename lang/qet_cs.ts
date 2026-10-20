@@ -2358,6 +2358,21 @@ Chcete je také přečíslovat?</numerusform>
 <context>
     <name>ChangeCableCoresCommand</name>
     <message>
+        <location filename="../sources/cable/cablepart.cpp" line="1"/>
+        <source>Move a core label</source>
+        <translation>Přesunout popisek žíly</translation>
+    </message>
+    <message>
+        <location filename="../sources/cable/cablepart.cpp" line="1"/>
+        <source>Rotate a core label</source>
+        <translation>Natočit popisek žíly</translation>
+    </message>
+    <message>
+        <location filename="../sources/cable/cablepart.cpp" line="1"/>
+        <source>Reset a core label</source>
+        <translation>Obnovit popisek žíly</translation>
+    </message>
+    <message>
         <location filename="../sources/cable/cablepart.cpp" line="2233"/>
         <source>Place a cable core</source>
         <translation>Umístit žílu kabelu</translation>
@@ -3780,6 +3795,26 @@ Hold Shift and drag to move this text on its own</source>
         <location filename="../sources/diagramview.cpp" line="2360"/>
         <source>Remove this core from the line</source>
         <translation>Odebrat tuto žílu z čáry</translation>
+    </message>
+    <message>
+        <location filename="../sources/diagramview.cpp" line="1"/>
+        <source>Rotate this label 90° clockwise</source>
+        <translation>Natočit tento popisek o 90° doprava</translation>
+    </message>
+    <message>
+        <location filename="../sources/diagramview.cpp" line="1"/>
+        <source>Rotate this label 90° counterclockwise</source>
+        <translation>Natočit tento popisek o 90° doleva</translation>
+    </message>
+    <message>
+        <location filename="../sources/diagramview.cpp" line="1"/>
+        <source>Reset this label</source>
+        <translation>Obnovit tento popisek</translation>
+    </message>
+    <message>
+        <location filename="../sources/diagramview.cpp" line="1"/>
+        <source>Puts this core label back with the others: removes its own position and rotation</source>
+        <translation>Vrátí popisek žíly k ostatním: zruší jeho vlastní polohu a natočení</translation>
     </message>
     <message>
         <location filename="../sources/diagramview.cpp" line="2645"/>

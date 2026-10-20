@@ -147,6 +147,18 @@ class CablePart : public QetGraphicsItem
 				@return true when a core was taken off
 			*/
 		bool takeCoreOffLine(int core);
+			/**
+				Turn the colour label of one core of this line by that
+				many degrees, on its own -- the others stay as they are.
+				One undo step.
+				@return true when it was turned
+			*/
+		bool turnCoreLabel(int core, qreal by);
+			///Put the colour label of one core back where the whole row
+			///of colours puts it, unturned. One undo step.
+		bool resetCoreLabel(int core);
+			///Whether that core's label was moved or turned on its own
+		bool coreLabelChanged(int core) const;
 
 			/**
 				Which wire this line runs across at the very place a colour
@@ -352,9 +364,17 @@ class CablePart : public QetGraphicsItem
 		qreal underTop() const;
 		QRectF typeRect() const;
 		QRectF lengthRect() const;
-		QRectF coreLabelRect(const QPointF &at, const QString &color) const;
+		QRectF coreLabelRect(const QPointF &at, const QString &color,
+							 const QPointF &own_offset = QPointF(),
+							 qreal own_rotation = 0.0) const;
 		QSizeF coreLabelSize(const QString &text) const;
-		QPointF coreLabelPivot(const QPointF &at, const QString &color) const;
+		QPointF coreLabelPivot(const QPointF &at, const QString &color,
+							   const QPointF &own_offset = QPointF()) const;
+			///How far that core's own label is moved right now: where the
+			///mouse holds it while it is dragged, else what the cable says
+		QPointF ownLabelOffset(const CableCore &core) const;
+			///The core whose colour text -- not its slash -- stands there
+		int coreTextAt(const QPointF &scene_pos) const;
 		QPointF coreDrawPosition(const CableCore &core) const;
 		bool coreDrawn(const CableCore &core) const;
 		QPointF dragPosition(const QPointF &scene_pos) const;
@@ -381,7 +401,9 @@ class CablePart : public QetGraphicsItem
 		void drawCores(QPainter *painter, const QColor &ink) const;
 			///Draw the slash of one core and the colour written beside it
 		void drawCoreMark(QPainter *painter, const QColor &ink,
-						  const QPointF &at, const QString &color) const;
+						  const QPointF &at, const QString &color,
+						  const QPointF &own_offset = QPointF(),
+						  qreal own_rotation = 0.0) const;
 		void syncGeometry();
 		bool labelAt(int core, const QPointF &scene_pos) const;
 		///Answer to the question of taking a wire another cable holds
@@ -451,6 +473,13 @@ class CablePart : public QetGraphicsItem
 
 			///Core being dragged by its slash, -1 when none
 		int m_dragged_core = -1;
+			///The core whose colour label alone is being dragged, -1
+			///when none is; its slash and wiring stay where they are
+		int m_dragged_label = -1;
+			///Where that label stands while it is dragged, and stood
+			///when the drag began
+		QPointF m_label_drag_offset;
+		QPointF m_label_offset_before;
 			///Core waiting to be put down by the next click, -1 when none
 		int m_pending_core = -1;
 			///True while the mouse stands close enough to this line for

@@ -478,9 +478,7 @@ void Cable::setCore(const CableCore &core)
 
 	for (int i = 0; i < m_cores.size(); ++i) {
 		if (m_cores.at(i).core == core.core) {
-			if (m_cores.at(i).conductor == core.conductor
-				&& m_cores.at(i).part == core.part
-				&& m_cores.at(i).position == core.position) {
+			if (m_cores.at(i) == core) {
 				return;
 			}
 			m_cores[i] = core;
@@ -895,6 +893,15 @@ QDomElement Cable::toXml(QDomDocument &document) const
 		}
 		e.setAttribute(QLatin1String("x"), QString::number(core.position.x(), 'f', 2));
 		e.setAttribute(QLatin1String("y"), QString::number(core.position.y(), 'f', 2));
+			//Only a label moved or turned on its own says so
+		if (!core.label_offset.isNull()) {
+			e.setAttribute(QLatin1String("label_dx"), QString::number(core.label_offset.x(), 'f', 2));
+			e.setAttribute(QLatin1String("label_dy"), QString::number(core.label_offset.y(), 'f', 2));
+		}
+		if (!qFuzzyIsNull(core.label_rotation)) {
+			e.setAttribute(QLatin1String("label_rotation"),
+						   QString::number(core.label_rotation, 'f', 2));
+		}
 		root.appendChild(e);
 	}
 
@@ -1012,6 +1019,15 @@ void Cable::fromXml(const QDomElement &element)
 		core.conductor = QUuid(e.attribute(QLatin1String("conductor")));
 		core.position = QPointF(e.attribute(QLatin1String("x")).toDouble(),
 								e.attribute(QLatin1String("y")).toDouble());
+		{
+				//Anything not a plain number leaves the label where it was
+			const auto number = [&e](const char *name) {
+				const qreal v = e.attribute(QLatin1String(name)).toDouble();
+				return std::isfinite(v) ? v : 0.0;
+			};
+			core.label_offset = QPointF(number("label_dx"), number("label_dy"));
+			core.label_rotation = std::fmod(number("label_rotation"), 360.0);
+		}
 		if (hasCore(core.core)) {
 			continue;
 		}

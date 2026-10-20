@@ -48,6 +48,12 @@ struct CableCore
 	QUuid conductor;
 		/// Where the slash sits, in the coordinates of its own part
 	QPointF position;
+		/// How far this one colour label is moved from where it would
+		/// stand, on top of the nudge of the whole row of colours
+	QPointF label_offset;
+		/// How far this one colour label is turned, in degrees clockwise,
+		/// on top of the turn of the whole row of colours
+	qreal label_rotation = 0.0;
 
 		///Two assignments are the same when they say the same thing, so
 		///undo can tell a gesture which changed something from one which
@@ -55,7 +61,9 @@ struct CableCore
 	friend bool operator==(const CableCore &a, const CableCore &b)
 	{
 		return a.core == b.core && a.part == b.part
-				&& a.conductor == b.conductor && a.position == b.position;
+				&& a.conductor == b.conductor && a.position == b.position
+				&& a.label_offset == b.label_offset
+				&& qFuzzyCompare(1.0 + a.label_rotation, 1.0 + b.label_rotation);
 	}
 	friend bool operator!=(const CableCore &a, const CableCore &b)
 	{

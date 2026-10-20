@@ -34,6 +34,9 @@
 	And the cross-section written under every colour: "2,5" gets its
 	unit, it is kept in the file, the tick hides it, and the two lines
 	are drawn inside what the item covers, turned or not.
+
+	And each colour label on its own: moved and turned apart from the
+	others, kept in the file, and still drawn inside what the item covers.
 */
 class tst_cablerotation : public QObject
 {
@@ -42,8 +45,8 @@ class tst_cablerotation : public QObject
 	Cable m_cable;
 	CablePart *m_part = nullptr;
 
-		///Where the drawing of the part puts ink, in scene coordinates
-	QRectF inkRect()
+		///The drawing of the part, in the scene area (-400,-400 800x800)
+	QImage render()
 	{
 		const QRectF area(-400, -400, 800, 800);
 		QImage image(area.size().toSize(), QImage::Format_ARGB32);
@@ -53,6 +56,14 @@ class tst_cablerotation : public QObject
 		QStyleOptionGraphicsItem option;
 		m_part->paint(&painter, &option, nullptr);
 		painter.end();
+		return image;
+	}
+
+		///Where the drawing of the part puts ink, in scene coordinates
+	QRectF inkRect()
+	{
+		const QRectF area(-400, -400, 800, 800);
+		const QImage image = render();
 
 		int left = image.width(), top = image.height(), right = -1, bottom = -1;
 		for (int y = 0 ; y < image.height() ; ++y)
@@ -259,6 +270,83 @@ class tst_cablerotation : public QObject
 								.arg(covered.x()).arg(covered.y()).arg(covered.width()).arg(covered.height())));
 			m_cable.setCoreSection(QString());
 			turn(0, 0);
+		}
+
+		void ownLabelSavedAndReadBack()
+		{
+			CableCore c = m_cable.core(1);
+			c.label_offset = QPointF(12, -7);
+			c.label_rotation = 90;
+			m_cable.setCore(c);
+			QCOMPARE(m_cable.core(1).label_offset, QPointF(12, -7));
+
+			QDomDocument doc;
+			const QDomElement e = m_cable.toXml(doc);
+			Cable read;
+			read.fromXml(e);
+			QCOMPARE(read.core(1).label_offset, QPointF(12, -7));
+			QCOMPARE(read.core(1).label_rotation, 90.0);
+			QCOMPARE(read.core(0).label_offset, QPointF());
+				// Only the label moved on its own says so in the file
+			int with = 0;
+			const QDomNodeList cores = e.elementsByTagName("core");
+			for (int i = 0 ; i < cores.size() ; ++i)
+				if (cores.at(i).toElement().hasAttribute("label_dx")) ++with;
+			QCOMPARE(with, 1);
+
+			c.label_offset = QPointF();
+			c.label_rotation = 0;
+			m_cable.setCore(c);
+			QCOMPARE(m_cable.core(1).label_offset, QPointF());
+		}
+
+		void ownLabelNotFinite()
+		{
+			QDomDocument doc;
+			QDomElement e = m_cable.toXml(doc);
+			QDomElement core = e.firstChildElement("core");
+			core.setAttribute("label_dx", "nan");
+			core.setAttribute("label_rotation", "inf");
+			Cable read;
+			read.fromXml(e);
+			const int index = core.attribute("index").toInt();
+			QCOMPARE(read.core(index).label_offset, QPointF());
+			QCOMPARE(read.core(index).label_rotation, 0.0);
+		}
+
+		void ownLabelMovesOnlyThatOne_data()
+		{
+			QTest::addColumn<QPointF>("offset");
+			QTest::addColumn<qreal>("rotation");
+			QTest::newRow("up") << QPointF(0, -60) << 0.0;
+			QTest::newRow("right and turned") << QPointF(40, 10) << 90.0;
+			QTest::newRow("turned only") << QPointF() << 45.0;
+		}
+		void ownLabelMovesOnlyThatOne()
+		{
+			QFETCH(QPointF, offset);
+			QFETCH(qreal, rotation);
+			m_cable.setCoreSection("2,5");
+			const QImage plain = render();
+			CableCore c = m_cable.core(2);
+			c.label_offset = offset;
+			c.label_rotation = rotation;
+			m_cable.setCore(c);
+			const QRectF moved = inkRect();
+			QVERIFY2(render() != plain, "the label did not move");
+			const QRectF covered = m_part->boundingRect().adjusted(-1, -1, 1, 1);
+			QVERIFY2(covered.contains(moved),
+					 qPrintable(QString("ink %1,%2 %3x%4 outside %5,%6 %7x%8")
+								.arg(moved.x()).arg(moved.y()).arg(moved.width()).arg(moved.height())
+								.arg(covered.x()).arg(covered.y()).arg(covered.width()).arg(covered.height())));
+				// The other cores stand where they stood
+			QCOMPARE(m_cable.core(0).label_offset, QPointF());
+			QCOMPARE(m_cable.core(1).label_rotation, 0.0);
+			c.label_offset = QPointF();
+			c.label_rotation = 0;
+			m_cable.setCore(c);
+			QVERIFY(render() == plain);
+			m_cable.setCoreSection(QString());
 		}
 
 		void coreLevelAt90()

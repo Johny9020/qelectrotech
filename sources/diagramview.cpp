@@ -2375,11 +2375,27 @@ bool DiagramView::cableCoreMenu(const QPoint &menu_pos, const QPoint &global_pos
 	}
 
 	QMenu menu(this);
+		//The label of this one core, on its own: dragging its text moves
+		//it, these turn it or put it back with the rest of the row
+	QAction *turn_right = menu.addAction(tr("Rotate this label 90° clockwise"));
+	QAction *turn_left = menu.addAction(tr("Rotate this label 90° counterclockwise"));
+	QAction *reset = menu.addAction(tr("Reset this label"));
+	reset->setStatusTip(tr("Puts this core label back with the others: "
+						   "removes its own position and rotation"));
+	reset->setEnabled(part->coreLabelChanged(core));
+	menu.addSeparator();
 	QAction *take = menu.addAction(tr("Remove this core from the line"));
 	take->setIcon(QET::Icons::Cable);
 
-	if (menu.exec(global_pos) == take) {
+	QAction *chosen = menu.exec(global_pos);
+	if (chosen == take) {
 		part->takeCoreOffLine(core);
+	} else if (chosen == turn_right) {
+		part->turnCoreLabel(core, 90.0);
+	} else if (chosen == turn_left) {
+		part->turnCoreLabel(core, -90.0);
+	} else if (chosen == reset) {
+		part->resetCoreLabel(core);
 	}
 	return true;
 }
