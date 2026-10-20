@@ -2759,6 +2759,9 @@ void Diagram::titleBlockTemplateChanged(const QString &template_name) {
 		return;
 
 	border_and_titleblock.titleBlockTemplateChanged(template_name);
+		//A template with other row heights makes the title block taller
+		//or shorter: the folio has to grow or shrink with it
+	adjustSceneRect();
 	update();
 }
 

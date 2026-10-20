@@ -182,6 +182,10 @@ class TitleBlockTemplate : public QObject {
 			const TitleBlockCell &,
 			const DiagramContext &,
 			const QRect &) const;
+		///Where the logo of that cell is drawn, given the image's own size
+	static QRectF logoRect(const TitleBlockCell &,
+			       const QRectF &,
+			       const QSizeF &);
 	void applyCellSpans();
 	void forgetSpanning();
 	void forgetSpanning(TitleBlockCell *, bool = true);

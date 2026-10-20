@@ -1733,6 +1733,52 @@ void TitleBlockTemplate::renderDxf(QRectF &title_block_rect,
 
 
 /**
+	@brief TitleBlockTemplate::logoRect
+	Where the logo of a cell is drawn. With no size set it fills the
+	whole cell, as logos always did. With one side set the other one
+	follows the proportions of the image; with both set the logo takes
+	exactly that size. It then stands in the cell the way the cell's
+	alignment says (centered by default), cut off by the cell's edges
+	when it is larger than the cell.
+	@param cell a logo cell
+	@param cell_rect the rectangle of that cell
+	@param natural the size of the image itself
+	@return the rectangle to draw the image into
+*/
+QRectF TitleBlockTemplate::logoRect(const TitleBlockCell &cell,
+				    const QRectF &cell_rect,
+				    const QSizeF &natural)
+{
+	qreal width = cell.logo_width;
+	qreal height = cell.logo_height;
+	if (width <= 0 && height <= 0) {
+		return cell_rect;
+	}
+	const bool proportions = natural.width() > 0 && natural.height() > 0;
+	if (width <= 0) {
+		width = proportions ? height * natural.width() / natural.height()
+				    : cell_rect.width();
+	} else if (height <= 0) {
+		height = proportions ? width * natural.height() / natural.width()
+				     : cell_rect.height();
+	}
+
+	qreal x = cell_rect.left() + (cell_rect.width() - width) / 2.0;
+	if (cell.horizontalAlign() & Qt::AlignLeft) {
+		x = cell_rect.left();
+	} else if (cell.horizontalAlign() & Qt::AlignRight) {
+		x = cell_rect.right() - width;
+	}
+	qreal y = cell_rect.top() + (cell_rect.height() - height) / 2.0;
+	if (cell.verticalAlign() & Qt::AlignTop) {
+		y = cell_rect.top();
+	} else if (cell.verticalAlign() & Qt::AlignBottom) {
+		y = cell_rect.bottom() - height;
+	}
+	return QRectF(x, y, width, height);
+}
+
+/**
 	@brief TitleBlockTemplate::renderCell
 	Render a titleblock cell.
 	@param painter :
@@ -1767,12 +1813,16 @@ void TitleBlockTemplate::renderCell(QPainter &painter,
 			 *    (or, at least, not resolution-limited) rendering
 			 */
 			if (vector_logos_.contains(cell.logo_reference)) {
-				vector_logos_[cell.logo_reference] -> render(
-							&painter,
-							cell_rect);
+				QSvgRenderer *svg = vector_logos_[cell.logo_reference];
+				const QRectF target = logoRect(cell, cell_rect, svg -> defaultSize());
+				painter.setClipRect(cell_rect, Qt::IntersectClip);
+				svg -> render(&painter, target);
 			} else if (bitmap_logos_.contains(cell.logo_reference)) {
-				painter.drawPixmap(cell_rect,
-						   bitmap_logos_[cell.logo_reference]);
+				const QPixmap &pixmap = bitmap_logos_[cell.logo_reference];
+				const QRectF target = logoRect(cell, cell_rect, pixmap.size());
+				painter.setClipRect(cell_rect, Qt::IntersectClip);
+				painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+				painter.drawPixmap(target, pixmap, QRectF(pixmap.rect()));
 			}
 		}
 	} else if (cell.type() == TitleBlockCell::TextCell) {

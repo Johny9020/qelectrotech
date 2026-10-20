@@ -15412,6 +15412,36 @@ Co si přejete udělat?</translation>
 <context>
     <name>QETTitleBlockTemplateEditor</name>
     <message>
+        <location filename="../sources/titleblock/qettemplateeditor.cpp" line="1"/>
+        <source>Update projects</source>
+        <comment>message box title</comment>
+        <translation>Aktualizovat projekty</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblock/qettemplateeditor.cpp" line="1"/>
+        <source>These open projects keep their own copy of the template “%1”, so they still show the old one:
+
+%2
+
+Update their copy?</source>
+        <comment>message box content - %1 is a title block template name</comment>
+        <translation>Tyto otevřené projekty mají vlastní kopii vzoru „%1“, a proto stále zobrazují tu starou:
+
+%2
+
+Aktualizovat jejich kopii?</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../sources/titleblock/qettemplateeditor.cpp" line="1"/>
+        <source>%1 (%n folio(s))</source>
+        <comment>project name and how many of its folios use the template</comment>
+        <translation>
+            <numerusform>%1 (%n list)</numerusform>
+            <numerusform>%1 (%n listy)</numerusform>
+            <numerusform>%1 (%n listů)</numerusform>
+        </translation>
+    </message>
+    <message>
         <location filename="../sources/titleblock/qettemplateeditor.cpp" line="130"/>
         <source>Save current template?</source>
         <comment>dialog title</comment>
@@ -16265,6 +16295,18 @@ Co si přejete udělat?</translation>
         <source>logo</source>
         <comment>title block cell property human name</comment>
         <translation>Logo</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblockcell.cpp" line="1"/>
+        <source>logo width</source>
+        <comment>title block cell property human name</comment>
+        <translation>šířka loga</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblockcell.cpp" line="1"/>
+        <source>logo height</source>
+        <comment>title block cell property human name</comment>
+        <translation>výška loga</translation>
     </message>
     <message>
         <location filename="../sources/titleblockcell.cpp" line="121"/>
@@ -23644,6 +23686,41 @@ Přiřazení názvu &quot;volta&quot; a hodnoty &quot;1745&quot; v záhlaví vý
 </context>
 <context>
     <name>TitleBlockTemplateCellWidget</name>
+    <message>
+        <location filename="../sources/titleblock/templatecellwidget.cpp" line="1"/>
+        <source>Logo size:</source>
+        <translation>Velikost loga:</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblock/templatecellwidget.cpp" line="1"/>
+        <source> px</source>
+        <translation> px</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblock/templatecellwidget.cpp" line="1"/>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblock/templatecellwidget.cpp" line="1"/>
+        <source>width:</source>
+        <translation>šířka:</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblock/templatecellwidget.cpp" line="1"/>
+        <source>height:</source>
+        <translation>výška:</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblock/templatecellwidget.cpp" line="1"/>
+        <source>Width of the logo. Auto keeps the proportions of the image; with both on Auto the logo fills the cell.</source>
+        <translation>Šířka loga. Auto zachová poměr stran obrázku; když jsou oba rozměry na Auto, logo vyplní celou buňku.</translation>
+    </message>
+    <message>
+        <location filename="../sources/titleblock/templatecellwidget.cpp" line="1"/>
+        <source>Height of the logo. Auto keeps the proportions of the image; with both on Auto the logo fills the cell.</source>
+        <translation>Výška loga. Auto zachová poměr stran obrázku; když jsou oba rozměry na Auto, logo vyplní celou buňku.</translation>
+    </message>
     <message>
         <location filename="../sources/titleblock/templatecellwidget.cpp" line="58"/>
         <source>Cell type:</source>

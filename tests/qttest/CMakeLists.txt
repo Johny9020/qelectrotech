@@ -303,6 +303,13 @@ target_compile_definitions(tst_conductorbend PRIVATE
 # back, and drawn inside the item's bounding rectangle.
 qet_add_app_test(tst_cablerotation tst_cablerotation.cpp)
 
+# Logos of a title block template: their own width and height, placed by
+# the alignment, saved only when set; open projects keeping a copy of a
+# changed template get it replaced and redrawn.
+qet_add_app_test(tst_titleblocklogo tst_titleblocklogo.cpp)
+target_compile_definitions(tst_titleblocklogo PRIVATE
+  "QET_EXAMPLES_DIR=\"${QET_DIR}/examples\"")
+
 # Accepting the settings dialog writes qet-assistant.json with the
 # collection paths just chosen, not the ones they replace.
 qet_add_app_test(tst_assistantinfopaths tst_assistantinfopaths.cpp)

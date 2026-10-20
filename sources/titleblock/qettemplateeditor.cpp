@@ -17,15 +17,18 @@
 */
 #include "qettemplateeditor.h"
 
+#include "../diagram.h"
 #include "../qetapp.h"
 #include "../qeticons.h"
 #include "../shortcutmanager.h"
 #include "../qetmessagebox.h"
 #include "../qetproject.h"
+#include "../titleblocktemplate.h"
 #include "templatecellwidget.h"
 #include "templatecommands.h"
 #include "templatelocationsaver.h"
 #include "templatelogomanager.h"
+#include "templatescollection.h"
 #include "templateview.h"
 #include "../toolbarsettings.h"
 
@@ -823,7 +826,118 @@ bool QETTitleBlockTemplateEditor::saveAs(const TitleBlockTemplateLocation &locat
 	location_ = location;
 	undo_stack_ -> setClean();
 	setReadOnly(false);
+
+	if (QETProject *own = collection -> parentProject()) {
+		// the folios of that project redraw by themselves (the collection
+		// says it changed); the project has to know it has to be saved
+		own -> setModified(true);
+	} else {
+		offerToUpdateProjects(location.name(), elmt);
+	}
 	return(true);
+}
+
+/**
+	@brief QETTitleBlockTemplateEditor::projectsWithOtherCopy
+	A project draws its folios with the copy of a template it holds
+	itself, taken when the template was given to a folio -- so changing
+	the template in a collection changes none of them on its own.
+	@param name the name of the template
+	@param xml the template as it now stands
+	@return the open projects holding a copy of that name which differs
+*/
+QList<QETProject *> QETTitleBlockTemplateEditor::projectsWithOtherCopy(
+		const QString &name,
+		const QDomElement &xml)
+{
+	// both sides written by the very same code, so that only a real
+	// difference counts -- not the order of attributes in an older file
+	const auto normalized = [&name](const QDomElement &element) {
+		TitleBlockTemplate tbt;
+		QDomElement copy = element.cloneNode(true).toElement();
+		copy.setTagName("titleblocktemplate");
+		copy.setAttribute("name", name);
+		if (!tbt.loadFromXmlElement(copy)) return QString();
+		QDomDocument doc;
+		QDomElement root = doc.createElement("root");
+		tbt.saveToXmlElement(root);
+		doc.appendChild(root);
+		return doc.toString();
+	};
+	const QString wanted = normalized(xml);
+
+	QList<QETProject *> projects;
+	const QList<QETProject *> open = QETApp::registeredProjects().values();
+	for (QETProject *project : open) {
+		if (!project || project -> isReadOnly()) continue;
+		TitleBlockTemplatesProjectCollection *collection =
+				project -> embeddedTitleBlockTemplatesCollection();
+		if (!collection || !collection -> templates().contains(name)) continue;
+		if (normalized(collection -> getTemplateXmlDescription(name)) != wanted) {
+			projects << project;
+		}
+	}
+	return projects;
+}
+
+/**
+	@brief QETTitleBlockTemplateEditor::updateProjectCopies
+	@param projects the projects whose copy is replaced
+	@param name the name of the template
+	@param xml the template as it now stands
+*/
+void QETTitleBlockTemplateEditor::updateProjectCopies(
+		const QList<QETProject *> &projects,
+		const QString &name,
+		const QDomElement &xml)
+{
+	for (QETProject *project : projects) {
+		TitleBlockTemplatesProjectCollection *collection =
+				project -> embeddedTitleBlockTemplatesCollection();
+		if (collection && collection -> setTemplateXmlDescription(name, xml)) {
+			project -> setModified(true);
+		}
+	}
+}
+
+/**
+	@brief QETTitleBlockTemplateEditor::offerToUpdateProjects
+	After saving a template of a collection: offer to bring the open
+	projects which hold an older copy of it up to date, so their folios
+	show what was just saved.
+	@param name the name of the template
+	@param xml the template as it was saved
+*/
+void QETTitleBlockTemplateEditor::offerToUpdateProjects(const QString &name,
+							 const QDomElement &xml)
+{
+	const QList<QETProject *> projects = projectsWithOtherCopy(name, xml);
+	if (projects.isEmpty()) return;
+
+	QStringList lines;
+	for (QETProject *project : projects) {
+		int folios = 0;
+		for (Diagram *diagram : project -> diagrams()) {
+			if (diagram -> border_and_titleblock.titleBlockTemplateName() == name) {
+				++folios;
+			}
+		}
+		lines << tr("%1 (%n folio(s))", "project name and how many of its folios use the template", folios)
+				 .arg(project -> pathNameTitle());
+	}
+
+	const auto answer = QET::QetMessageBox::question(
+		this,
+		tr("Update projects", "message box title"),
+		tr("These open projects keep their own copy of the template "
+		   "\u201c%1\u201d, so they still show the old one:\n\n%2\n\n"
+		   "Update their copy?",
+		   "message box content - %1 is a title block template name").arg(name, lines.join("\n")),
+		QMessageBox::Yes | QMessageBox::No,
+		QMessageBox::Yes);
+	if (answer == QMessageBox::Yes) {
+		updateProjectCopies(projects, name, xml);
+	}
 }
 
 /**

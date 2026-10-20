@@ -73,6 +73,23 @@ void TitleBlockTemplateCellWidget::initWidgets()
 	logo_input_ = new QComboBox();
 	logo_input_ -> addItem(tr("No logo"));
 	add_logo_input_ = new QPushButton(QET::Icons::InsertImage, tr("Manage logos"));
+	logo_size_label_ = new QLabel(tr("Logo size:"));
+	const auto size_input = [this](const QString &tip) {
+		auto *input = new QSpinBox();
+		input -> setRange(0, 5000);
+		input -> setSuffix(tr(" px"));
+		// 0 lets the other side (or the cell) decide
+		input -> setSpecialValueText(tr("Auto"));
+		input -> setToolTip(tip);
+		input -> setKeyboardTracking(false);
+		return input;
+	};
+	logo_width_input_ = size_input(tr("Width of the logo. Auto keeps the "
+					  "proportions of the image; with both on "
+					  "Auto the logo fills the cell."));
+	logo_height_input_ = size_input(tr("Height of the logo. Auto keeps the "
+					   "proportions of the image; with both on "
+					   "Auto the logo fills the cell."));
 	
 	// widgets specific to text cells
 	label_checkbox_ = new QCheckBox(tr("Display a label:"));
@@ -136,6 +153,16 @@ void TitleBlockTemplateCellWidget::initWidgets()
 	cell_editor_text_layout_ -> addWidget(logo_label_,         5, 0);
 	cell_editor_text_layout_ -> addWidget(logo_input_,         5, 1);
 	cell_editor_text_layout_ -> addWidget(add_logo_input_,     5, 2);
+	logo_size_row_ = new QWidget();
+	QHBoxLayout *logo_size = new QHBoxLayout(logo_size_row_);
+	logo_size -> setContentsMargins(0, 0, 0, 0);
+	logo_size -> addWidget(new QLabel(tr("width:")));
+	logo_size -> addWidget(logo_width_input_);
+	logo_size -> addWidget(new QLabel(tr("height:")));
+	logo_size -> addWidget(logo_height_input_);
+	logo_size -> addStretch();
+	cell_editor_text_layout_ -> addWidget(logo_size_label_,    7, 0);
+	cell_editor_text_layout_ -> addWidget(logo_size_row_,      7, 1, 1, 3);
 	cell_editor_text_layout_ -> addWidget(empty_label_,        6, 0);
 	cell_editor_text_layout_ -> setColumnStretch(4, 4000);
 	cell_editor_layout_ = new QVBoxLayout();
@@ -159,6 +186,8 @@ void TitleBlockTemplateCellWidget::initWidgets()
 	connect(font_size_input_, qOverload<int>(&QSpinBox::valueChanged), this, &TitleBlockTemplateCellWidget::editFontSize);
 	connect(font_adjust_input_, &QCheckBox::clicked, this, &TitleBlockTemplateCellWidget::editAdjust);
 	connect(logo_input_, qOverload<int>(&QComboBox::activated), this, &TitleBlockTemplateCellWidget::editLogo);
+	connect(logo_width_input_, qOverload<int>(&QSpinBox::valueChanged), this, &TitleBlockTemplateCellWidget::editLogoWidth);
+	connect(logo_height_input_, qOverload<int>(&QSpinBox::valueChanged), this, &TitleBlockTemplateCellWidget::editLogoHeight);
 	
 	updateFormType(TitleBlockCell::TextCell);
 }
@@ -179,6 +208,11 @@ void TitleBlockTemplateCellWidget::updateFormType(int cell_type) {
 	logo_label_        -> setVisible(cell_type == TitleBlockCell::LogoCell);
 	logo_input_        -> setVisible(cell_type == TitleBlockCell::LogoCell);
 	add_logo_input_    -> setVisible(cell_type == TitleBlockCell::LogoCell);
+	logo_size_label_   -> setVisible(cell_type == TitleBlockCell::LogoCell);
+	logo_size_row_     -> setVisible(cell_type == TitleBlockCell::LogoCell);
+	// a logo stands in its cell the way the alignment says
+	const bool aligned = cell_type == TitleBlockCell::TextCell
+			  || cell_type == TitleBlockCell::LogoCell;
 	
 	label_checkbox_    -> setVisible(cell_type == TitleBlockCell::TextCell);
 	label_input_       -> setVisible(cell_type == TitleBlockCell::TextCell);
@@ -186,11 +220,11 @@ void TitleBlockTemplateCellWidget::updateFormType(int cell_type) {
 	value_label_       -> setVisible(cell_type == TitleBlockCell::TextCell);
 	value_input_       -> setVisible(cell_type == TitleBlockCell::TextCell);
 	value_edit_        -> setVisible(cell_type == TitleBlockCell::TextCell);
-	align_label_       -> setVisible(cell_type == TitleBlockCell::TextCell);
-	horiz_align_label_ -> setVisible(cell_type == TitleBlockCell::TextCell);
-	horiz_align_input_ -> setVisible(cell_type == TitleBlockCell::TextCell);
-	vert_align_label_  -> setVisible(cell_type == TitleBlockCell::TextCell);
-	vert_align_input_  -> setVisible(cell_type == TitleBlockCell::TextCell);
+	align_label_       -> setVisible(aligned);
+	horiz_align_label_ -> setVisible(aligned);
+	horiz_align_input_ -> setVisible(aligned);
+	vert_align_label_  -> setVisible(aligned);
+	vert_align_input_  -> setVisible(aligned);
 	font_size_label_   -> setVisible(cell_type == TitleBlockCell::TextCell);
 	font_size_input_   -> setVisible(cell_type == TitleBlockCell::TextCell);
 	font_adjust_input_ -> setVisible(cell_type == TitleBlockCell::TextCell);
@@ -222,6 +256,13 @@ void TitleBlockTemplateCellWidget::edit(TitleBlockCell *cell) {
 	font_size_input_   -> blockSignals(false);
 	
 	logo_input_        -> setCurrentIndex(logo_input_ -> findData(cell -> logo_reference));
+	
+	logo_width_input_  -> blockSignals(true);
+	logo_height_input_ -> blockSignals(true);
+	logo_width_input_  -> setValue(cell -> logo_width);
+	logo_height_input_ -> setValue(cell -> logo_height);
+	logo_width_input_  -> blockSignals(false);
+	logo_height_input_ -> blockSignals(false);
 }
 
 /**
@@ -301,6 +342,24 @@ void TitleBlockTemplateCellWidget::editAdjust()
 }
 
 /**
+	Emit a logo width modification command.
+	@see ModifyTitleBlockCellCommand
+*/
+void TitleBlockTemplateCellWidget::editLogoWidth()
+{
+	emitModification("logo_width", logo_width_input_ -> value());
+}
+
+/**
+	Emit a logo height modification command.
+	@see ModifyTitleBlockCellCommand
+*/
+void TitleBlockTemplateCellWidget::editLogoHeight()
+{
+	emitModification("logo_height", logo_height_input_ -> value());
+}
+
+/**
 	Emit a logo modification command.
 	@see ModifyTitleBlockCellCommand
 */
@@ -344,6 +403,8 @@ void TitleBlockTemplateCellWidget::setReadOnly(bool read_only) {
 	
 	cell_type_input_ -> setEnabled(!read_only_);
 	logo_input_ -> setEnabled(!read_only_);
+	logo_width_input_ -> setReadOnly(read_only_);
+	logo_height_input_ -> setReadOnly(read_only_);
 	name_input_ -> setReadOnly(read_only_);
 	label_checkbox_ -> setEnabled(!read_only_);
 	label_edit_ -> setEnabled(!read_only_);

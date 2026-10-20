@@ -137,6 +137,21 @@ class QETTitleBlockTemplateEditor : public QETMainWindow {
 	void updateEditorTitle();
 	void updateActions();
 	bool saveAs(const TitleBlockTemplateLocation &);
+	public:
+		/**
+			The open projects keeping their own copy of the template
+			\a name which differs from \a xml: a folio draws the copy
+			its project holds, never the template of a collection.
+		*/
+	static QList<QETProject *> projectsWithOtherCopy(const QString &name,
+							 const QDomElement &xml);
+		///Replace that copy in each of those projects: their folios redraw
+	static void updateProjectCopies(const QList<QETProject *> &projects,
+					const QString &name,
+					const QDomElement &xml);
+	private:
+	void offerToUpdateProjects(const QString &name, const QDomElement &xml);
+	private slots:
 	bool saveAs(const QString &);
 };
 

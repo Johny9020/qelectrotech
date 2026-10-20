@@ -74,5 +74,11 @@ class TitleBlockCell {
 	int font_size;                     ///< Font size the text should be rendered with
 	bool hadjust;                      ///< Whether to reduce the font size if the text does not fit in the cell
 	QString logo_reference;            ///< Logo displayed by this cell, it it is a logo cell
+	int logo_width;                    ///< Width of the logo in px; 0 follows the height, or fills the cell when both are 0
+	int logo_height;                   ///< Height of the logo in px; 0 follows the width, or fills the cell when both are 0
+	
+	private:
+	void loadAlignmentFromXml(const QDomElement &);
+	void saveAlignmentToXml(QDomElement &) const;
 };
 #endif

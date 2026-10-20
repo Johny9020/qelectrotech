@@ -16,6 +16,8 @@ TitleBlockCell::TitleBlockCell()
 	font_size = 9;
 	hadjust = false;
 	logo_reference = QString("");
+	logo_width = 0;
+	logo_height = 0;
 }
 
 /**
@@ -64,6 +66,10 @@ void TitleBlockCell::setAttribute(const QString &attribute, const QVariant &attr
 		value_name = attr_value.toString();
 	} else if (attribute == "logo") {
 		logo_reference = attr_value.toString();
+	} else if (attribute == "logo_width") {
+		logo_width = qMax(0, attr_value.toInt());
+	} else if (attribute == "logo_height") {
+		logo_height = qMax(0, attr_value.toInt());
 	} else if (attribute == "label") {
 		label = qvariant_cast<NamesList>(attr_value);
 	} else if (attribute == "displaylabel") {
@@ -90,6 +96,10 @@ QVariant TitleBlockCell::attribute(const QString &attribute) {
 		return(value_name);
 	} else if (attribute == "logo") {
 		return(logo_reference);
+	} else if (attribute == "logo_width") {
+		return(logo_width);
+	} else if (attribute == "logo_height") {
+		return(logo_height);
 	} else if (attribute == "label") {
 		return(QVariant::fromValue(label));
 	} else if (attribute == "displaylabel") {
@@ -117,6 +127,10 @@ QString TitleBlockCell::attributeName(const QString &attribute) {
 		return(QObject::tr("name", "title block cell property human name"));
 	} else if (attribute == "logo") {
 		return(QObject::tr("logo", "title block cell property human name"));
+	} else if (attribute == "logo_width") {
+		return(QObject::tr("logo width", "title block cell property human name"));
+	} else if (attribute == "logo_height") {
+		return(QObject::tr("logo height", "title block cell property human name"));
 	} else if (attribute == "label") {
 		return(QObject::tr("label", "title block cell property human name"));
 	} else if (attribute == "displaylabel") {
@@ -149,6 +163,8 @@ void TitleBlockCell::loadContentFromCell(const TitleBlockCell &other_cell) {
 	value_name = other_cell.value_name;
 	cell_type = other_cell.cell_type;
 	logo_reference = other_cell.logo_reference;
+	logo_width = other_cell.logo_width;
+	logo_height = other_cell.logo_height;
 	value = other_cell.value;
 	label = other_cell.label;
 	display_label = other_cell.display_label;
@@ -171,6 +187,15 @@ void TitleBlockCell::loadContentFromXml(const QDomElement &cell_element) {
 		if (cell_element.hasAttribute("resource") && !cell_element.attribute("resource").isEmpty()) {
 			cell_type = TitleBlockCell::LogoCell;
 			logo_reference = cell_element.attribute("resource");
+		}
+		// size of the logo, 0 (or nothing) meaning "fill the cell"
+		int size;
+		logo_width = QET::attributeIsAnInteger(cell_element, "width", &size) ? qMax(0, size) : 0;
+		logo_height = QET::attributeIsAnInteger(cell_element, "height", &size) ? qMax(0, size) : 0;
+		// where it stands in the cell: centered unless told otherwise
+		alignment = Qt::AlignHCenter | Qt::AlignVCenter;
+		if (cell_element.hasAttribute("align") || cell_element.hasAttribute("valign")) {
+			loadAlignmentFromXml(cell_element);
 		}
 	} else if (cell_element.tagName() == "field") {
 		cell_type = TitleBlockCell::TextCell;
@@ -205,17 +230,7 @@ void TitleBlockCell::loadContentFromXml(const QDomElement &cell_element) {
 		}
 		
 		// horizontal and vertical alignments
-		alignment = 0;
-		
-		QString halignment = cell_element.attribute("align", "left");
-		if (halignment == "right") alignment |= Qt::AlignRight;
-		else if (halignment == "center") alignment |= Qt::AlignHCenter;
-		else alignment |= Qt::AlignLeft;
-		
-		QString valignment = cell_element.attribute("valign", "center");
-		if (valignment == "bottom") alignment |= Qt::AlignBottom;
-		else if (valignment == "top") alignment |= Qt::AlignTop;
-		else alignment |= Qt::AlignVCenter;
+		loadAlignmentFromXml(cell_element);
 		
 		// horizontal text adjustment
 		hadjust = cell_element.attribute("hadjust", "true") == "true";
@@ -234,6 +249,12 @@ void TitleBlockCell::saveContentToXml(QDomElement &cell_elmt) {
 	} else if (type() == TitleBlockCell::LogoCell) {
 		cell_elmt.setTagName("logo");
 		cell_elmt.setAttribute("resource", logo_reference);
+		if (logo_width > 0) cell_elmt.setAttribute("width", logo_width);
+		if (logo_height > 0) cell_elmt.setAttribute("height", logo_height);
+		// a centered logo writes nothing, like every logo before
+		if (alignment != (Qt::AlignHCenter | Qt::AlignVCenter)) {
+			saveAlignmentToXml(cell_elmt);
+		}
 	} else {
 		cell_elmt.setTagName("field");
 		
@@ -251,22 +272,50 @@ void TitleBlockCell::saveContentToXml(QDomElement &cell_elmt) {
 			cell_elmt.setAttribute("fontsize", font_size);
 		}
 		
-		if (alignment & Qt::AlignRight) {
-			cell_elmt.setAttribute("align", "right");
-		} else if (alignment & Qt::AlignHCenter) {
-			cell_elmt.setAttribute("align", "center");
-		} else {
-			cell_elmt.setAttribute("align", "left");
-		}
-		
-		if (alignment & Qt::AlignBottom) {
-			cell_elmt.setAttribute("valign", "bottom");
-		} else if (alignment & Qt::AlignTop) {
-			cell_elmt.setAttribute("valign", "top");
-		} else {
-			cell_elmt.setAttribute("valign", "center");
-		}
+		saveAlignmentToXml(cell_elmt);
 		
 		if (hadjust) cell_elmt.setAttribute("hadjust", "true");
+	}
+}
+
+/**
+	@brief TitleBlockCell::loadAlignmentFromXml
+	Read the "align" and "valign" attributes: left and centered when
+	missing, as text cells always were.
+	@param cell_element
+*/
+void TitleBlockCell::loadAlignmentFromXml(const QDomElement &cell_element) {
+	alignment = 0;
+	
+	QString halignment = cell_element.attribute("align", "left");
+	if (halignment == "right") alignment |= Qt::AlignRight;
+	else if (halignment == "center") alignment |= Qt::AlignHCenter;
+	else alignment |= Qt::AlignLeft;
+	
+	QString valignment = cell_element.attribute("valign", "center");
+	if (valignment == "bottom") alignment |= Qt::AlignBottom;
+	else if (valignment == "top") alignment |= Qt::AlignTop;
+	else alignment |= Qt::AlignVCenter;
+}
+
+/**
+	@brief TitleBlockCell::saveAlignmentToXml
+	@param cell_elmt receives the "align" and "valign" attributes
+*/
+void TitleBlockCell::saveAlignmentToXml(QDomElement &cell_elmt) const {
+	if (alignment & Qt::AlignRight) {
+		cell_elmt.setAttribute("align", "right");
+	} else if (alignment & Qt::AlignHCenter) {
+		cell_elmt.setAttribute("align", "center");
+	} else {
+		cell_elmt.setAttribute("align", "left");
+	}
+	
+	if (alignment & Qt::AlignBottom) {
+		cell_elmt.setAttribute("valign", "bottom");
+	} else if (alignment & Qt::AlignTop) {
+		cell_elmt.setAttribute("valign", "top");
+	} else {
+		cell_elmt.setAttribute("valign", "center");
 	}
 }

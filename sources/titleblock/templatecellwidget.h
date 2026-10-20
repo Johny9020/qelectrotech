@@ -55,6 +55,10 @@ class TitleBlockTemplateCellWidget : public QWidget {
 		QLabel      *logo_label_;
 		QComboBox   *logo_input_;
 		QPushButton *add_logo_input_;
+		QLabel      *logo_size_label_;
+		QWidget     *logo_size_row_;
+		QSpinBox    *logo_width_input_;
+		QSpinBox    *logo_height_input_;
 
 		QLabel        *name_label_;
 		QLineEdit     *name_input_;
@@ -111,6 +115,8 @@ class TitleBlockTemplateCellWidget : public QWidget {
 		void editAlignment();
 		void editFontSize();
 		void editAdjust();
+		void editLogoWidth();
+		void editLogoHeight();
 		void editLogo();
 		void updateLogosComboBox(const TitleBlockTemplate *);
 		void setReadOnly(bool);
