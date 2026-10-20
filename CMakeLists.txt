@@ -233,6 +233,27 @@ if(APPLE)
     set_source_files_properties(${QET_MAC_ICON} PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources")
     target_sources(${PROJECT_NAME} PRIVATE ${QET_MAC_ICON})
+
+    # The app looks for the common elements collection and title block
+    # templates inside the bundle (QET_COMMON_COLLECTION_PATH and
+    # QET_COMMON_TBT_PATH), so copy them there. A separate target that runs
+    # on every build keeps the bundle in sync when only these files change.
+    if(CMAKE_VERSION VERSION_LESS 3.26)
+        set(QET_COPY_DIR_CMD copy_directory)
+    else()
+        set(QET_COPY_DIR_CMD copy_directory_if_different)
+    endif()
+    set(QET_BUNDLE_RESOURCES
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.app/Contents/Resources")
+    add_custom_target(${PROJECT_NAME}_bundle_data ALL
+        COMMAND ${CMAKE_COMMAND} -E ${QET_COPY_DIR_CMD}
+                "${QET_DIR}/elements" "${QET_BUNDLE_RESOURCES}/elements"
+        COMMAND ${CMAKE_COMMAND} -E ${QET_COPY_DIR_CMD}
+                "${QET_DIR}/titleblocks" "${QET_BUNDLE_RESOURCES}/titleblocks"
+        COMMENT "Copying elements and title blocks into the app bundle"
+        VERBATIM
+    )
+    add_dependencies(${PROJECT_NAME}_bundle_data ${PROJECT_NAME})
 endif()
 
 # The default build only compiles the tracked .ts files to .qm (lrelease).
